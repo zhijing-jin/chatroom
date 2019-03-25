@@ -47,10 +47,9 @@ def do_User():
     username = ''.join(username)
     if not username:
         MsgWin.insert(1.0, "\n[Error] Username cannot be empty.")
-        return
-
-    outstr = "\n[User] username: " + username
-    CmdWin.insert(1.0, outstr)
+    else:
+        outstr = "\n[User] username: " + username
+        CmdWin.insert(1.0, outstr)
     userentry.delete(0, END)
 
 
