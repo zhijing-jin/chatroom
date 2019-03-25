@@ -56,9 +56,11 @@ def do_User():
 
 def do_List():
     CmdWin.insert(1.0, "\nPress List")
-    MsgWin.insert(1.0, "\n[Message Window] List is pressed")
+
     msg = 'L::\r\n'
     rmsg = query(msg, sockfd)
+    MsgWin.insert(1.0, "[List] The received message: {}".format(rmsg))
+
     groups = parse_groups(rmsg)
     MsgWin.insert(1.0, "Groups: {}".format(', '.join(groups)))
     # G:Name1:Name2:Name3::\r\n
