@@ -11,7 +11,8 @@ from tkinter import *
 import sys
 import socket
 from build_socket import build_socket
-from interaction import query
+from interaction import query, parse_groups
+
 #
 # Global variables
 #
@@ -56,7 +57,11 @@ def do_User():
 def do_List():
     CmdWin.insert(1.0, "\nPress List")
     MsgWin.insert(1.0, "\n[Message Window] List is pressed")
-
+    msg = 'L::\r\n'
+    rmsg = query(msg, sockfd)
+    groups = parse_groups(rmsg)
+    MsgWin.insert(1.0, "Groups: {}".format(', '.join(groups)))
+    # G:Name1:Name2:Name3::\r\n
 
 def do_Join():
     CmdWin.insert(1.0, "\nPress JOIN")
