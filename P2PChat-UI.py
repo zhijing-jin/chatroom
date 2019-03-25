@@ -41,6 +41,9 @@ def do_User():
     username = userentry.get()
     username = [c for c in username if c != ':'][:32]
     username = ''.join(username)
+    if not username:
+        MsgWin.insert(1.0, "\n[Error] Username cannot be empty.")
+        return
 
     outstr = "\n[User] username: " + username
     CmdWin.insert(1.0, outstr)
