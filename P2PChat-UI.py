@@ -10,11 +10,14 @@
 from tkinter import *
 import sys
 import socket
-
+from build_socket import build_socket
 
 #
 # Global variables
 #
+server = argv[1]
+port = int(argv[2])
+sockfd = build_socket(server, port)
 
 
 #
@@ -57,6 +60,11 @@ def do_List():
 
 def do_Join():
     CmdWin.insert(1.0, "\nPress JOIN")
+    msg = 'J:roomname:username:{userIP}:{port}::\r\n'.format(userIP=server, port=port)
+    sockfd.send(msg)
+    rmsg = sockfd.recv(32)
+
+    print("The received message (raw):", rmsg)
 
 
 def do_Send():
@@ -70,6 +78,7 @@ def do_Poke():
 def do_Quit():
     CmdWin.insert(1.0, "\nPress Quit")
     sys.exit(0)
+    sockfd.close()
 
 
 #
