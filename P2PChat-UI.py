@@ -11,12 +11,12 @@ from tkinter import *
 import sys
 import socket
 from build_socket import build_socket
-
+from interaction import query
 #
 # Global variables
 #
-server = argv[1]
-port = int(argv[2])
+server = sys.argv[1]
+port = int(sys.argv[2])
 sockfd = build_socket(server, port)
 
 
@@ -60,11 +60,12 @@ def do_List():
 
 def do_Join():
     CmdWin.insert(1.0, "\nPress JOIN")
-    msg = 'J:roomname:username:{userIP}:{port}::\r\n'.format(userIP=server, port=port)
-    sockfd.send(msg)
-    rmsg = sockfd.recv(32)
 
-    print("The received message (raw):", rmsg)
+    msg = 'J:roomname:username:{userIP}:{port}::\r\n'.format(userIP=server, port=port)
+    rmsg = query(msg, sockfd)
+    MsgWin.insert(1.0, "The received message: {}".format(rmsg))
+
+    # b'M:13178503100665701845:username:'
 
 
 def do_Send():

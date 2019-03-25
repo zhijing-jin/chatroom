@@ -16,8 +16,8 @@ def build_socket(server, port):
     # once the connection is established; print out
     # the socket addresses of your local socket and
     # the Comm_pipe
-    print("Connection established.")
-    print("My socket address is", sockfd.getsockname())
-    print("Comm_pipe socket address is", sockfd.getpeername())
+    print("[Info] Connection established.")
+    print("[Info] My socket address is", sockfd.getsockname())
+    print("[Info] Comm_pipe socket address is", sockfd.getpeername())
 
     return sockfd
