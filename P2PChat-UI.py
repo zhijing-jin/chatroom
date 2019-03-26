@@ -46,7 +46,7 @@ def do_User():
     username = [c for c in username if c != ':'][:32]
     username = ''.join(username)
     if not username:
-        MsgWin.insert(1.0, "\n[Error] Username cannot be empty.")
+        CmdWin.insert(1.0, "\n[Error] Username cannot be empty.")
     else:
         outstr = "\n[User] username: " + username
         CmdWin.insert(1.0, outstr)
@@ -54,14 +54,22 @@ def do_User():
 
 
 def do_List():
-    CmdWin.insert(1.0, "\nPress List")
-
     msg = 'L::\r\n'
     rmsg = query(msg, sockfd)
-    MsgWin.insert(1.0, "\n[List] The received message: {}".format(rmsg))
 
     groups = parse_groups(rmsg)
-    MsgWin.insert(1.0, "\nGroups: {}".format(', '.join(groups)))
+    print(groups, len(groups))
+
+    if groups == ['']:
+        CmdWin.insert(1.0, "\n[List] No active chatrooms")
+    else:
+        for group in groups:
+            CmdWin.insert(1.0, "\n    {}".format(group))
+        CmdWin.insert(1.0, "\n[List] Here are the active chatrooms:")
+
+    MsgWin.insert(1.0, "\nThe received message: {}".format(rmsg))
+
+
     # G:Name1:Name2:Name3::\r\n
 
 def do_Join():
@@ -69,7 +77,7 @@ def do_Join():
 
     msg = 'J:roomname:username:{userIP}:{port}::\r\n'.format(userIP=server, port=port)
     rmsg = query(msg, sockfd)
-    MsgWin.insert(1.0, "The received message: {}".format(rmsg))
+    MsgWin.insert(1.0, "\nThe received message: {}".format(rmsg))
 
     # b'M:13178503100665701845:username:'
 
@@ -88,11 +96,9 @@ def do_Quit():
     sockfd.close()
 
 def do_Auto():
-    CmdWin.insert(1.0, "\nPress Auto")
-
     msg = 'J:COMP3234:triangle:{userIP}:{port}::\r\n'.format(userIP=server, port=port)
     rmsg = query(msg, sockfd)
-    MsgWin.insert(1.0, "The received message: {}".format(rmsg))
+    MsgWin.insert(1.0, "\nThe received message: {}".format(rmsg))
 #
 # Set up of Basic UI
 #
