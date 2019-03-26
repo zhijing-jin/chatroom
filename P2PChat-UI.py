@@ -22,6 +22,7 @@ sockfd = build_socket(server, port)
 username = ""
 roomname = ""
 
+
 #
 # This is the hash function for generating a unique
 # Hash ID for each peer.
@@ -71,8 +72,8 @@ def do_List():
 
     MsgWin.insert(1.0, "\nThe received message: {}".format(rmsg))
 
-
     # G:Name1:Name2:Name3::\r\n
+
 
 def do_Join():
     global roomname
@@ -82,7 +83,8 @@ def do_Join():
         CmdWin.insert(1.0, "\n[Error] roomname cannot be empty.")
     else:
         userentry.delete(0, END)
-        msg = 'J:{roomname}:{username}:{userIP}:{port}::\r\n'.format(roomname=roomname, username=username, userIP=server, port=port)
+        msg = 'J:{roomname}:{username}:{userIP}:{port}::\r\n'.format(roomname=roomname, username=username,
+                                                                     userIP=server, port=port)
         MsgWin.insert(1.0, "\n[JOIN] Want to join room with: {}".format(msg))
         rmsg = query(msg, sockfd)
 
@@ -111,7 +113,8 @@ def do_Poke():
 
     if not targetname:
 
-        msg = 'J:{roomname}:{username}:{userIP}:{port}::\r\n'.format(roomname=roomname, username=username, userIP=server, port=port)
+        msg = 'J:{roomname}:{username}:{userIP}:{port}::\r\n'.format(roomname=roomname, username=username,
+                                                                     userIP=server, port=port)
         rmsg = query(msg, sockfd)
         membermsg = parse_memberships(rmsg)
         memberships = membermsg[1::3]
@@ -120,21 +123,20 @@ def do_Poke():
                 CmdWin.insert(1.0, "\n    {}".format(member))
         CmdWin.insert(1.0, "\n[Error] To whom you want to send the poke?")
 
-        
-
-
-
 
 def do_Quit():
     CmdWin.insert(1.0, "\nPress Quit")
     sys.exit(0)
     sockfd.close()
 
+
 # this is a test button, that create a user and a room without using the UI
 def do_Auto():
     msg = 'J:COMP3234:triangle:{userIP}:{port}::\r\n'.format(userIP=server, port=port)
     rmsg = query(msg, sockfd)
     MsgWin.insert(1.0, "\nThe received message: {}".format(rmsg))
+
+
 #
 # Set up of Basic UI
 #
