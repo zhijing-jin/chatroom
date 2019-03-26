@@ -56,4 +56,4 @@ def parse_memberships(msg_str, prefix="M:", suffix="::\r\n"):
     msg_str = msg_str[len(prefix): -len(suffix)]
 
     # user_ID:IP:port
-return msg_str.split(':')
+    return msg_str.split(':')

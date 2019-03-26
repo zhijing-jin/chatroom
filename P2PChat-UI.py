@@ -19,6 +19,8 @@ from utils import sdbm_hash
 from build_socket import build_socket
 from interaction import query, parse_rmsg, parse_memberships, parse_members
 
+import multiprocessing
+from time import sleep
 #
 # Global variables
 #
@@ -74,6 +76,7 @@ def do_List():
 
 
 def do_Join():
+    print("join~~", flush=False)
     global roomname, server
     roomname = userentry.get()
     userentry.delete(0, END)
@@ -97,24 +100,31 @@ def do_Join():
             CmdWin.insert(1.0, outstr)
         MsgWin.insert(1.0, "\n[Join] received msg: {}".format(rmsg))
 
-        while True:
-            second = datetime.datetime.now().strftime('%m%d%H%M-%S')[-2:]
-            if int(second) % 20 == 0:
-                rmsg = query(msg, sockfd)
+        # while True:
+        #     second = datetime.datetime.now().strftime('%m%d%H%M-%S')[-2:]
+        #     if int(second) % 20 == 0:
+        #         rmsg = query(msg, sockfd)
 
-        gList = parse_members(rmsg)
+        # gList = parse_members(rmsg)
+        #
+        # myHashID = sdbm_hash("{}{}{}".format(username, server, myport))
+        # import pdb; pdb.set_trace()
+        #
+        # ix = [ix for ix, item in enumerate(gList) if item.HashID == myHashID][0]
+        # start = ix + 1
+        # if len(gList) > start:
+        #     while gList[start].HashID != myHashID:
+        #         pass
 
-        myHashID = sdbm_hash("{}{}{}".format(username, server, myport))
-        import pdb; pdb.set_trace()
-
-        ix = [ix for ix, item in enumerate(gList) if item.HashID == myHashID][0]
-        start = ix + 1
-        if len(gList) > start:
-            while gList[start].HashID != myHashID:
-                pass
+        if mysock == None:
+            print("starts multi process")
+            p = multiprocessing.Process(target=set_my_server)
+            p.start()
+        #set_my_server(1)
+        print("out of looooop", flush=False)
 
 def set_my_server():
-    #global mysock
+    print("in server")
 
     global mysock
     address = (myserver, myport)
@@ -127,13 +137,14 @@ def set_my_server():
 
     # start the main loop
     while(True):
+        print("waiting...")
 
         msg, addr = mysock.recvfrom(1024)
 
         if not msg:
             print("[Error] chat server broken")
         else:
-            print(msg, addr)
+            print(msg, addr, flush=False)
             rmsg = parse_rmsg(msg, prefix="K:", suffix="::\r\n")
             CmdWin.insert(1.0, "\n~~~~~~~~~~~~~{}~~~~~~~~~~~~~~".format(rmsg[1]))
             mysock.sendto(str.encode("A::\r\n"), addr)
@@ -172,11 +183,16 @@ def do_Poke():
     elif not targetname in memberships:
         CmdWin.insert(1.0, "\n[Error] The username you provided is not in this chatroom")
     else:
+        # global mysock
+        # if not mysock:
+        #     print("rediculous!")\
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         msg = 'K:{roomname}:{username}::\r\n'.format(roomname=roomname, username=username)
         MsgWin.insert(1.0, "\n The message you are sending is " + msg)
-        idx = memberships.index(targetname)
-        mysock.sendto(str.encode(msg), (memberships[idx+1],memberships[idx+2]))
-        rmsg = mysock.recvfrom(1000)
+        idx = membermsg.index(targetname)
+        print("index of ", targetname, " is ", idx, membermsg,flush=False)
+        s.sendto(str.encode(msg), (membermsg[idx+1], membermsg[idx+2]))
+        rmsg = s.recvfrom(1000)
         if "A::\r\n" == msg:
             CmdWin.insert(1.0, "\n[Poke] You poked {}".format(targetname))
         else:

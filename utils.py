@@ -36,7 +36,7 @@ def multiproc():
 def show_time(what_happens='', cat_server=False, printout=True):
     import datetime
 
-    disp = '⏰\ttime: ' + \
+    disp = '\ttime: ' + \
         datetime.datetime.now().strftime('%m%d%H%M-%S')
     disp = disp + '\t' + what_happens if what_happens else disp
     if printout:
