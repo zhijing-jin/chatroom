@@ -11,7 +11,7 @@ from tkinter import *
 import sys
 import socket
 from build_socket import build_socket
-from interaction import query, parse_groups, parse_memberships
+from interaction import query, parse_groups, parse_memberships #, parse_poke
 
 #
 # Global variables
@@ -61,7 +61,6 @@ def do_List():
     rmsg = query(msg, sockfd)
 
     groups = parse_groups(rmsg)
-    print(groups, len(groups))
 
     if groups == ['']:
         CmdWin.insert(1.0, "\n[List] No active chatrooms")
@@ -111,17 +110,31 @@ def do_Poke():
 
     targetname = userentry.get()
 
-    if not targetname:
+    # if empty, provide list; if not empty check if it's inside the list
+    msg = 'J:{roomname}:{username}:{userIP}:{port}::\r\n'.format(roomname=roomname, username=username,
+                                                                 userIP=server, port=port)
+    rmsg = query(msg, sockfd)
+    membermsg = parse_memberships(rmsg)
+    memberships = membermsg[1::3]
 
-        msg = 'J:{roomname}:{username}:{userIP}:{port}::\r\n'.format(roomname=roomname, username=username,
-                                                                     userIP=server, port=port)
-        rmsg = query(msg, sockfd)
-        membermsg = parse_memberships(rmsg)
-        memberships = membermsg[1::3]
+    if not targetname:
         for member in memberships:
             if member != username:
                 CmdWin.insert(1.0, "\n    {}".format(member))
-        CmdWin.insert(1.0, "\n[Error] To whom you want to send the poke?")
+        CmdWin.insert(1.0, "\n[Poke] To whom you want to send the poke?")
+    elif targetname == username:
+        CmdWin.insert(1.0, "\n[Error] Cannot poke yourselves")
+    elif not targetname in memberships:
+        CmdWin.insert(1.0, "\n[Error] The username you provided is not in this chatroom")
+    else:
+        msg = 'K:{roomname}:{username}::\r\n'.format(roomname=roomname, username=targetname)
+        MsgWin.insert(1.0, "\n The message you are sending is " + msg)
+        rmsg = query(msg, sockfd)
+        if "A::\r\n" == msg:
+            CmdWin.insert(1.0, "\n[Poke] You poked {}".format(targetname))
+        else:
+            CmdWin.insert(1.0, "\n[Error] Poke failure")
+
 
 
 def do_Quit():
