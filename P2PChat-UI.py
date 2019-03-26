@@ -133,13 +133,10 @@ def set_my_server():
         if not msg:
             print("[Error] chat server broken")
         else:
-
-            TCPclientMsg = "Message from Client:{}".format(msg)
-            clientIP  = "Client IP Address:{}".format(addr)
-
-            print(clientMsg)
-            print(clientIP)
-            mysock.sendto(str.encode("A::\r\n"), clientIP)
+            print(msg, addr)
+            rmsg = parse_rmsg(msg, prefix="K:", suffix="::\r\n")
+            CmdWin.insert(1.0, "\n~~~~~~~~~~~~~{}~~~~~~~~~~~~~~".format(rmsg[1]))
+            mysock.sendto(str.encode("A::\r\n"), addr)
     mysock.close()
 
 
