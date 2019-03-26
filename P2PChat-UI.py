@@ -14,7 +14,7 @@ import socket
 sys.path.append('.')
 
 from build_socket import build_socket
-from interaction import query, parse_rmsg, parse_memberships
+from interaction import query, parse_rmsg, parse_memberships, parse_members
 
 #
 # Global variables
