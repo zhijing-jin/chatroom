@@ -122,16 +122,17 @@ def do_Join():
         #     while gList[start].HashID != myHashID:
         #         pass
 
+        ## FIXME: if mysock is created inside the other process, mysock may still be None.
         if mysock == None:
             print("starts multi process")
-            p = multiprocessing.Process(target=set_my_server)
+            p = multiprocessing.Process(target=set_my_server) #, args=(shared_list,))
             p.start()
             multiproc += [p]
         else:
             print("we have established the server!")
         #set_my_server(1)
 
-def set_my_server():
+def set_my_server(): #shared_list):
     print("in server")
 
     global mysock
@@ -154,9 +155,9 @@ def set_my_server():
         else:
             print(msg, addr, flush=False)
             rmsg = parse_rmsg(msg.decode("utf-8"), prefix="K:", suffix="::\r\n")
-            #MsgWin.insert(1.0, "\n~~~~~~~~~~~~~{}~~~~~~~~~~~~~~".format(rmsg[1]))
-            MsgWin.insert(1.0, "\n The message you are sending is ") # + msg)
-            print("Inserted to Msg")
+            MsgWin.insert(1.0, "\n~~~~~~~~~~~~~{}~~~~~~~~~~~~~~".format(rmsg[1]))
+
+            print("You are poked by {}!!".format(rmsg[1]))
             mysock.sendto(str.encode("A::\r\n"), addr)
     mysock.close()
 
@@ -202,9 +203,13 @@ def do_Poke():
         idx = membermsg.index(targetname)
         print("index of ", targetname, " is ", str.encode(msg), (membermsg[idx+1], int(membermsg[idx+2])), flush=False)
         s.sendto(str.encode(msg), (membermsg[idx+1], int(membermsg[idx+2])))
+        s.settimeout(2);
         rmsg = s.recvfrom(1000) #.decode("utf-8")
-        print("this is rmsg", rmsg[0].decode("utf-8"), flush=False)
-        if "A::\r\n" == rmsg[0].decode("utf-8"):
+        if not rmsg:
+            print("failure",flush=False)
+            CmdWin.insert(1.0, "\n[Error] Poke failure")
+        elif "A::\r\n" == rmsg[0].decode("utf-8"):
+            print("success", flush=False)
             CmdWin.insert(1.0, "\n[Poke] You poked {}".format(targetname))
         else:
             CmdWin.insert(1.0, "\n[Error] Poke failure")
@@ -224,13 +229,7 @@ def do_Quit():
 
 
 
-# this is a test button, that create a user and a room without using the UI
-def do_Auto():
-    msg = 'J:COMP3234:triangle:{userIP}:{port}::\r\n'.format(userIP=server, port=port)
-    rmsg = query(msg, sockfd)
-    MsgWin.insert(1.0, "\nThe received message: {}".format(rmsg))
-
-
+# manager = multiprocessing.Manager()
 #
 # Set up of Basic UI
 #
@@ -244,6 +243,8 @@ topscroll = Scrollbar(topframe)
 MsgWin = Text(topframe, height='15', padx=5, pady=5,
               fg="red", exportselection=0, insertofftime=0)
 MsgWin.pack(side=LEFT, fill=BOTH, expand=True)
+# shared_list = manager.list()
+# shared_list.append(MsgWin)
 topscroll.pack(side=RIGHT, fill=Y, expand=True)
 MsgWin.config(yscrollcommand=topscroll.set)
 topscroll.config(command=MsgWin.yview)
@@ -270,10 +271,7 @@ Butt05 = Button(topmidframe, width='6', relief=RAISED,
                 text="Quit", command=do_Quit)
 Butt05.pack(side=LEFT, padx=8, pady=8)
 
-# auto buttons
-Butt07 = Button(topmidframe, width='6', relief=RAISED,
-                text="Auto", command=do_Auto)
-Butt07.pack(side=LEFT, padx=8, pady=8)
+
 
 # Lower Middle Frame for User input
 lowmidframe = Frame(win, relief=RAISED, borderwidth=1)
