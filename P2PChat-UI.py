@@ -19,9 +19,15 @@ from interaction import query, parse_groups, parse_memberships #, parse_poke
 server = sys.argv[1]
 port = int(sys.argv[2])
 sockfd = build_socket(server, port)
+
+myserver = '127.0.0.1'
+myport = int(sys.argv[3])
+mysock = None
 username = ""
 roomname = ""
 
+
+#set_my_server()
 
 #
 # This is the hash function for generating a unique
@@ -83,16 +89,54 @@ def do_Join():
     else:
         userentry.delete(0, END)
         msg = 'J:{roomname}:{username}:{userIP}:{port}::\r\n'.format(roomname=roomname, username=username,
-                                                                     userIP=server, port=port)
+                                                                     userIP=myserver, port=myport)
         MsgWin.insert(1.0, "\n[JOIN] Want to join room with: {}".format(msg))
         rmsg = query(msg, sockfd)
 
-        if rmsg[0] != 'F':
-            outstr = "\n[Join] roomname: " + roomname
-            CmdWin.insert(1.0, outstr)
         MsgWin.insert(1.0, "\nThe received message: {}".format(rmsg))
 
+    if not mysock:
+        set_my_server()
     # b'M:13178503100665701845:username:'
+
+def set_my_server():
+    #global mysock
+
+
+    address = (myserver, myport)
+    mysock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        mysock.bind((myserver, myport))
+    except socket.error as emsg:
+        print("Socket bind error: ", emsg)
+        sys.exit(1)
+
+    # start the main loop
+    while(True):
+
+        msg, addr = mysock.recvfrom(1024)
+
+        if not msg:
+            print(" err")
+        else:
+
+            TCPclientMsg = "Message from Client:{}".format(message)
+            clientIP  = "Client IP Address:{}".format(address)
+
+            print(clientMsg)
+            print(clientIP)
+            mysock.sendto(str.encode("A::\r\n"), clientIP)
+    mysock.close()    if not msg:
+            print(" err")
+        else:
+
+            TCPclientMsg = "Message from Client:{}".format(message)
+            clientIP  = "Client IP Address:{}".format(address)
+
+            print(clientMsg)
+            print(clientIP)
+            mysock.sendto(str.encode("A::\r\n"), clientIP)
+    mysock.close()
 
 
 def do_Send():
@@ -127,13 +171,16 @@ def do_Poke():
     elif not targetname in memberships:
         CmdWin.insert(1.0, "\n[Error] The username you provided is not in this chatroom")
     else:
-        msg = 'K:{roomname}:{username}::\r\n'.format(roomname=roomname, username=targetname)
+        msg = 'K:{roomname}:{username}::\r\n'.format(roomname=roomname, username=username)
         MsgWin.insert(1.0, "\n The message you are sending is " + msg)
-        rmsg = query(msg, sockfd)
+        idx = memberships.index(targetname)
+        mysock.sendto(str.encode(msg), (memberships[idx+1],memberships[idx+2]))
+        rmsg = mysock.recvfrom(1000)
         if "A::\r\n" == msg:
             CmdWin.insert(1.0, "\n[Poke] You poked {}".format(targetname))
         else:
             CmdWin.insert(1.0, "\n[Error] Poke failure")
+            print(rmsg)
 
 
 
