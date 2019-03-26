@@ -27,18 +27,24 @@ def parse_members(msg_str, prefix="M:", suffix="::\r\n"):
     # 15384212722403738702:u1:localhost:32340:u2:localhost:32340:u3:localhost:32340
     MSID = msg[0]
     mem_msg = msg[1:]
-    mems = {}
+    mems = []
     assert len(mem_msg) % 3 == 0, "[Error] membership messsage is not a multiple of 3"
     for ix in range(len(mem_msg))[::3]:
         name = mem_msg[ix]
         ip = mem_msg[ix + 1]
         port = mem_msg[ix + 2]
         hash = sdbm_hash(name + ip + port)
-        mems[hash] = {'name': name, 'ip': ip, 'port': int(port)}
-    mems = OrderedDict(sorted(mems.items()))
-    for ix, hash in enumerate(mems):
-        mems[hash]['ix'] = ix
-    return mems
+        mem = Member(HashID=hash, name=name, ip=ip, port=int(port))
+        mems += [mem]
+    gList = sorted(mems, key=lambda x: x.HashID, reverse=True)
+
+    return gList
+
+
+class Member(object):
+    def __init__(self, **kwargs):
+        for key in kwargs:
+            setattr(self, key, kwargs[key])
 
 
 def parse_memberships(msg_str, prefix="M:", suffix="::\r\n"):

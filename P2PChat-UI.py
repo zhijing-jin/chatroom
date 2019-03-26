@@ -10,9 +10,12 @@
 from tkinter import *
 import sys
 import socket
+import datetime
+import sched
 
 sys.path.append('.')
 
+from utils import sdbm_hash
 from build_socket import build_socket
 from interaction import query, parse_rmsg, parse_memberships, parse_members
 
@@ -20,13 +23,13 @@ from interaction import query, parse_rmsg, parse_memberships, parse_members
 # Global variables
 #
 server = sys.argv[1]
+server = '127.0.0.1' if server == 'localhost' else server
+
 port = int(sys.argv[2])
 myport = int(sys.argv[3])
 sockfd = build_socket(server, port)
 username = ""
 roomname = ""
-
-
 
 
 #
@@ -66,8 +69,9 @@ def do_List():
 
 
 def do_Join():
-    global roomname
+    global roomname, server
     roomname = userentry.get()
+    userentry.delete(0, END)
 
     if not username:
         userentry.delete(0, END)
@@ -77,8 +81,6 @@ def do_Join():
     if not roomname:
         CmdWin.insert(1.0, "\n[Error] roomname cannot be empty.")
     else:
-        userentry.delete(0, END)
-        server = '127.0.0.1' if server == 'localhost' else server
         msg = 'J:{roomname}:{username}:{userIP}:{port}::\r\n'. \
             format(roomname=roomname, username=username,
                    userIP=server, port=myport)
@@ -90,12 +92,21 @@ def do_Join():
             CmdWin.insert(1.0, outstr)
         MsgWin.insert(1.0, "\n[Join] received msg: {}".format(rmsg))
 
-        members = parse_members(rmsg)
-        myhash = sdbm_hash(username + server + myport)
-        ix = members[myhash]['ix']
+        while True:
+            second = datetime.datetime.now().strftime('%m%d%H%M-%S')[-2:]
+            if int(second) % 20 == 0:
+                rmsg = query(msg, sockfd)
+
+        gList = parse_members(rmsg)
+
+        myHashID = sdbm_hash("{}{}{}".format(username, server, myport))
+        import pdb; pdb.set_trace()
+
+        ix = [ix for ix, item in enumerate(gList) if item.HashID == myHashID][0]
         start = ix + 1
-        
-    # b'M:3700733086810021925:user1:localhost:32340::'
+        if len(gList) > start:
+            while gList[start].HashID != myHashID:
+                pass
 
 
 def do_Send():
