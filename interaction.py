@@ -1,3 +1,7 @@
+from utils import sdbm_hash
+from collections import OrderedDict
+
+
 def query(msg_str, sockfd, recv_size=1000):
     msg = str.encode(msg_str)
     sockfd.send(msg)
@@ -7,6 +11,7 @@ def query(msg_str, sockfd, recv_size=1000):
 
     return rmsg
 
+
 def parse_rmsg(msg_str, prefix="G:", suffix="::\r\n"):
     # G:Name1:Name2:Name3::\r\n
 
@@ -14,6 +19,7 @@ def parse_rmsg(msg_str, prefix="G:", suffix="::\r\n"):
     assert msg_str.endswith(suffix), "Groups must end with {}".format(suffix)
     msg_str = msg_str[len(prefix): -len(suffix)]
     return msg_str.split(':')
+
 
 def parse_members(msg_str, prefix="M:", suffix="::\r\n"):
     msg = parse_rmsg(msg_str, prefix=prefix, suffix=suffix)
@@ -27,9 +33,12 @@ def parse_members(msg_str, prefix="M:", suffix="::\r\n"):
         name = mem_msg[ix]
         ip = mem_msg[ix + 1]
         port = mem_msg[ix + 2]
-        hash =
-        mems[hash] = {'name': name, 'ip': ip, 'port': port}
-
+        hash = sdbm_hash(name + ip + port)
+        mems[hash] = {'name': name, 'ip': ip, 'port': int(port)}
+    mems = OrderedDict(sorted(mems.items()))
+    for ix, hash in enumerate(mems):
+        mems[hash]['ix'] = ix
+    return mems
 
 
 def parse_memberships(msg_str, prefix="M:", suffix="::\r\n"):

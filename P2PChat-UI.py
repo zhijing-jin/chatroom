@@ -21,25 +21,12 @@ from interaction import query, parse_rmsg, parse_memberships
 #
 server = sys.argv[1]
 port = int(sys.argv[2])
+myport = int(sys.argv[3])
 sockfd = build_socket(server, port)
 username = ""
 roomname = ""
 
 
-#
-# This is the hash function for generating a unique
-# Hash ID for each peer.
-# Source: http://www.cse.yorku.ca/~oz/hash.html
-#
-# Concatenate the peer's username, str(IP address),
-# and str(Port) to form a string that be the input
-# to this hash function
-#
-def sdbm_hash(instr):
-    hash = 0
-    for c in instr:
-        hash = int(ord(c)) + (hash << 6) + (hash << 16) - hash
-    return hash & 0xffffffffffffffff
 
 
 #
@@ -91,9 +78,10 @@ def do_Join():
         CmdWin.insert(1.0, "\n[Error] roomname cannot be empty.")
     else:
         userentry.delete(0, END)
+        server = '127.0.0.1' if server == 'localhost' else server
         msg = 'J:{roomname}:{username}:{userIP}:{port}::\r\n'. \
             format(roomname=roomname, username=username,
-                   userIP=server, port=port)
+                   userIP=server, port=myport)
         MsgWin.insert(1.0, "\n[JOIN] sent msg: {}".format(msg))
         rmsg = query(msg, sockfd)
 
