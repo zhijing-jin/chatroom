@@ -17,7 +17,20 @@ def parse_rmsg(msg_str, prefix="G:", suffix="::\r\n"):
 
 def parse_members(msg_str, prefix="M:", suffix="::\r\n"):
     msg = parse_rmsg(msg_str, prefix=prefix, suffix=suffix)
-    
+    # M:15384212722403738702:u1:localhost:32340:u2:localhost:32340:u3:localhost:32340::
+    # 15384212722403738702:u1:localhost:32340:u2:localhost:32340:u3:localhost:32340
+    MSID = msg[0]
+    mem_msg = msg[1:]
+    mems = {}
+    assert len(mem_msg) % 3 == 0, "[Error] membership messsage is not a multiple of 3"
+    for ix in range(len(mem_msg))[::3]:
+        name = mem_msg[ix]
+        ip = mem_msg[ix + 1]
+        port = mem_msg[ix + 2]
+        hash =
+        mems[hash] = {'name': name, 'ip': ip, 'port': port}
+
+
 
 def parse_memberships(msg_str, prefix="M:", suffix="::\r\n"):
     # G:Name1:Name2:Name3::\r\n

@@ -10,11 +10,11 @@
 from tkinter import *
 import sys
 import socket
+
 sys.path.append('.')
 
 from build_socket import build_socket
 from interaction import query, parse_rmsg, parse_memberships
-
 
 #
 # Global variables
@@ -85,13 +85,15 @@ def do_Join():
     if not username:
         userentry.delete(0, END)
         CmdWin.insert(1.0, "\n[Error] Username cannot be empty. Pls input username and press [User].")
+        return
 
     if not roomname:
         CmdWin.insert(1.0, "\n[Error] roomname cannot be empty.")
     else:
         userentry.delete(0, END)
-        msg = 'J:{roomname}:{username}:{userIP}:{port}::\r\n'.format(roomname=roomname, username=username,
-                                                                     userIP=server, port=port)
+        msg = 'J:{roomname}:{username}:{userIP}:{port}::\r\n'. \
+            format(roomname=roomname, username=username,
+                   userIP=server, port=port)
         MsgWin.insert(1.0, "\n[JOIN] sent msg: {}".format(msg))
         rmsg = query(msg, sockfd)
 
@@ -100,10 +102,8 @@ def do_Join():
             CmdWin.insert(1.0, outstr)
         MsgWin.insert(1.0, "\n[Join] received msg: {}".format(rmsg))
 
-        membermsg = parse_memberships(rmsg)
-        memberships = membermsg[1::3]
+        membermsg = parse_members(rmsg)
     # b'M:3700733086810021925:user1:localhost:32340::'
-    # M:15529886605594238087:user3:localhost:32340:user2:localhost:32340:
 
 
 def do_Send():
