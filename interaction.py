@@ -1,8 +1,8 @@
 def query(msg_str, sockfd, recv_size=1000):
     msg = str.encode(msg_str)
     sockfd.send(msg)
-    rmsg = sockfd.recv(recv_size)
-    rmsg = str(b'hello', "utf-8")
+    rmsg = sockfd.recv(recv_size).decode("utf-8")
+    #rmsg = str(b'hello', "utf-8")
     if rmsg == 'F:error message::\r\n':
         print("[Error] F:error message")
 

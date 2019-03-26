@@ -58,10 +58,10 @@ def do_List():
 
     msg = 'L::\r\n'
     rmsg = query(msg, sockfd)
-    MsgWin.insert(1.0, "[List] The received message: {}".format(rmsg))
+    MsgWin.insert(1.0, "\n[List] The received message: {}".format(rmsg))
 
     groups = parse_groups(rmsg)
-    MsgWin.insert(1.0, "Groups: {}".format(', '.join(groups)))
+    MsgWin.insert(1.0, "\nGroups: {}".format(', '.join(groups)))
     # G:Name1:Name2:Name3::\r\n
 
 def do_Join():
@@ -87,7 +87,12 @@ def do_Quit():
     sys.exit(0)
     sockfd.close()
 
+def do_Auto():
+    CmdWin.insert(1.0, "\nPress Auto")
 
+    msg = 'J:COMP3234:triangle:{userIP}:{port}::\r\n'.format(userIP=server, port=port)
+    rmsg = query(msg, sockfd)
+    MsgWin.insert(1.0, "The received message: {}".format(rmsg))
 #
 # Set up of Basic UI
 #
@@ -126,6 +131,11 @@ Butt06.pack(side=LEFT, padx=8, pady=8)
 Butt05 = Button(topmidframe, width='6', relief=RAISED,
                 text="Quit", command=do_Quit)
 Butt05.pack(side=LEFT, padx=8, pady=8)
+
+# auto buttons
+Butt07 = Button(topmidframe, width='6', relief=RAISED,
+                text="Auto", command=do_Auto)
+Butt07.pack(side=LEFT, padx=8, pady=8)
 
 # Lower Middle Frame for User input
 lowmidframe = Frame(win, relief=RAISED, borderwidth=1)
