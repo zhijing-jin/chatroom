@@ -10,14 +10,23 @@
 from tkinter import *
 import sys
 import socket
+import datetime
+import sched
+
+sys.path.append('.')
+
+from utils import sdbm_hash
 from build_socket import build_socket
-from interaction import query, parse_groups, parse_memberships #, parse_poke
+from interaction import query, parse_rmsg, parse_memberships, parse_members
 
 #
 # Global variables
 #
 server = sys.argv[1]
+server = '127.0.0.1' if server == 'localhost' else server
+
 port = int(sys.argv[2])
+myport = int(sys.argv[3])
 sockfd = build_socket(server, port)
 
 myserver = '127.0.0.1'
@@ -28,22 +37,6 @@ roomname = ""
 
 
 #set_my_server()
-
-#
-# This is the hash function for generating a unique
-# Hash ID for each peer.
-# Source: http://www.cse.yorku.ca/~oz/hash.html
-#
-# Concatenate the peer's username, str(IP address),
-# and str(Port) to form a string that be the input
-# to this hash function
-#
-def sdbm_hash(instr):
-    hash = 0
-    for c in instr:
-        hash = int(ord(c)) + (hash << 6) + (hash << 16) - hash
-    return hash & 0xffffffffffffffff
-
 
 #
 # Functions to handle user input
@@ -66,7 +59,7 @@ def do_List():
     msg = 'L::\r\n'
     rmsg = query(msg, sockfd)
 
-    groups = parse_groups(rmsg)
+    groups = parse_rmsg(rmsg)
 
     if groups == ['']:
         CmdWin.insert(1.0, "\n[List] No active chatrooms")
@@ -81,23 +74,44 @@ def do_List():
 
 
 def do_Join():
-    global roomname
+    global roomname, server
     roomname = userentry.get()
+    userentry.delete(0, END)
+
+    if not username:
+        userentry.delete(0, END)
+        CmdWin.insert(1.0, "\n[Error] Username cannot be empty. Pls input username and press [User].")
+        return
 
     if not roomname:
         CmdWin.insert(1.0, "\n[Error] roomname cannot be empty.")
     else:
-        userentry.delete(0, END)
-        msg = 'J:{roomname}:{username}:{userIP}:{port}::\r\n'.format(roomname=roomname, username=username,
-                                                                     userIP=myserver, port=myport)
-        MsgWin.insert(1.0, "\n[JOIN] Want to join room with: {}".format(msg))
+        msg = 'J:{roomname}:{username}:{userIP}:{port}::\r\n'. \
+            format(roomname=roomname, username=username,
+                   userIP=server, port=myport)
+        MsgWin.insert(1.0, "\n[JOIN] sent msg: {}".format(msg))
         rmsg = query(msg, sockfd)
 
-        MsgWin.insert(1.0, "\nThe received message: {}".format(rmsg))
+        if rmsg[0] != 'F':
+            outstr = "\n[Join] roomname: " + roomname
+            CmdWin.insert(1.0, outstr)
+        MsgWin.insert(1.0, "\n[Join] received msg: {}".format(rmsg))
 
-    if not mysock:
-        set_my_server()
-    # b'M:13178503100665701845:username:'
+        while True:
+            second = datetime.datetime.now().strftime('%m%d%H%M-%S')[-2:]
+            if int(second) % 20 == 0:
+                rmsg = query(msg, sockfd)
+
+        gList = parse_members(rmsg)
+
+        myHashID = sdbm_hash("{}{}{}".format(username, server, myport))
+        import pdb; pdb.set_trace()
+
+        ix = [ix for ix, item in enumerate(gList) if item.HashID == myHashID][0]
+        start = ix + 1
+        if len(gList) > start:
+            while gList[start].HashID != myHashID:
+                pass
 
 def set_my_server():
     #global mysock
