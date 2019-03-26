@@ -11,7 +11,7 @@ from tkinter import *
 import sys
 import socket
 from build_socket import build_socket
-from interaction import query, parse_groups
+from interaction import query, parse_groups, parse_memberships
 
 #
 # Global variables
@@ -19,7 +19,8 @@ from interaction import query, parse_groups
 server = sys.argv[1]
 port = int(sys.argv[2])
 sockfd = build_socket(server, port)
-
+username = ""
+roomname = ""
 
 #
 # This is the hash function for generating a unique
@@ -42,6 +43,7 @@ def sdbm_hash(instr):
 #
 
 def do_User():
+    global username
     username = userentry.get()
     username = [c for c in username if c != ':'][:32]
     username = ''.join(username)
@@ -73,11 +75,21 @@ def do_List():
     # G:Name1:Name2:Name3::\r\n
 
 def do_Join():
-    CmdWin.insert(1.0, "\nPress JOIN")
+    global roomname
+    roomname = userentry.get()
 
-    msg = 'J:roomname:username:{userIP}:{port}::\r\n'.format(userIP=server, port=port)
-    rmsg = query(msg, sockfd)
-    MsgWin.insert(1.0, "\nThe received message: {}".format(rmsg))
+    if not roomname:
+        CmdWin.insert(1.0, "\n[Error] roomname cannot be empty.")
+    else:
+        userentry.delete(0, END)
+        msg = 'J:{roomname}:{username}:{userIP}:{port}::\r\n'.format(roomname=roomname, username=username, userIP=server, port=port)
+        MsgWin.insert(1.0, "\n[JOIN] Want to join room with: {}".format(msg))
+        rmsg = query(msg, sockfd)
+
+        if rmsg[0] != 'F':
+            outstr = "\n[Join] roomname: " + roomname
+            CmdWin.insert(1.0, outstr)
+        MsgWin.insert(1.0, "\nThe received message: {}".format(rmsg))
 
     # b'M:13178503100665701845:username:'
 
@@ -87,7 +99,30 @@ def do_Send():
 
 
 def do_Poke():
-    CmdWin.insert(1.0, "\nPress Poke")
+    if not username:
+        CmdWin.insert(1.0, "\n[Error] You must have a username first.")
+        return
+
+    if not roomname:
+        CmdWin.insert(1.0, "\n[Error] You must join a chatroom first.")
+        return
+
+    targetname = userentry.get()
+
+    if not targetname:
+
+        msg = 'J:{roomname}:{username}:{userIP}:{port}::\r\n'.format(roomname=roomname, username=username, userIP=server, port=port)
+        rmsg = query(msg, sockfd)
+        membermsg = parse_memberships(rmsg)
+        memberships = membermsg[1::3]
+        for member in memberships:
+            if member != username:
+                CmdWin.insert(1.0, "\n    {}".format(member))
+        CmdWin.insert(1.0, "\n[Error] To whom you want to send the poke?")
+
+        
+
+
 
 
 def do_Quit():
@@ -95,6 +130,7 @@ def do_Quit():
     sys.exit(0)
     sockfd.close()
 
+# this is a test button, that create a user and a room without using the UI
 def do_Auto():
     msg = 'J:COMP3234:triangle:{userIP}:{port}::\r\n'.format(userIP=server, port=port)
     rmsg = query(msg, sockfd)
