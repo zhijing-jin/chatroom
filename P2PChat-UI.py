@@ -90,7 +90,11 @@ def do_Join():
             CmdWin.insert(1.0, outstr)
         MsgWin.insert(1.0, "\n[Join] received msg: {}".format(rmsg))
 
-        membermsg = parse_members(rmsg)
+        members = parse_members(rmsg)
+        myhash = sdbm_hash(username + server + myport)
+        ix = members[myhash]['ix']
+        start = ix + 1
+        
     # b'M:3700733086810021925:user1:localhost:32340::'
 
 
