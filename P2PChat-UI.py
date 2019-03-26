@@ -116,7 +116,7 @@ def do_Join():
 def set_my_server():
     #global mysock
 
-
+    global mysock
     address = (myserver, myport)
     mysock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
