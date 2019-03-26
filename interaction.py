@@ -1,6 +1,7 @@
-
-from utils import sdbm_hash
+import time
+from utils import sdbm_hash, show_time
 from collections import OrderedDict
+from tkinter import END
 
 
 def query(msg_str, sockfd, recv_size=1000):
@@ -12,7 +13,13 @@ def query(msg_str, sockfd, recv_size=1000):
 
     return rmsg
 
+def parse_name(userentry, length=32):
+    name = userentry.get()
+    name = [c for c in name if c != ':'][:length]
+    name = ''.join(name)
+    userentry.delete(0, END)
 
+    return name
 def parse_rmsg(msg_str, prefix="G:", suffix="::\r\n"):
     # G:Name1:Name2:Name3::\r\n
 
@@ -56,4 +63,14 @@ def parse_memberships(msg_str, prefix="M:", suffix="::\r\n"):
     msg_str = msg_str[len(prefix): -len(suffix)]
 
     # user_ID:IP:port
-return msg_str.split(':')
+    return msg_str.split(':')
+
+def keepalive(msg, sockfd, txt='', interval=20):
+    while True:
+        # second = datetime.datetime.now().strftime('%m%d%H%M-%S')[-2:]
+        # if int(second) % 20 == 0:
+        time.sleep(interval)
+        # show_time(txt)
+        rmsg = query(msg, sockfd)
+
+
