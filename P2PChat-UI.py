@@ -88,7 +88,7 @@ def do_Join():
     else:
         msg = 'J:{roomname}:{username}:{userIP}:{port}::\r\n'. \
             format(roomname=roomname, username=username,
-                   userIP=server, port=myport)
+                   userIP=myserver, port=myport)
         MsgWin.insert(1.0, "\n[JOIN] sent msg: {}".format(msg))
         rmsg = query(msg, sockfd)
 
@@ -131,21 +131,11 @@ def set_my_server():
         msg, addr = mysock.recvfrom(1024)
 
         if not msg:
-            print(" err")
+            print("[Error] chat server broken")
         else:
 
-            TCPclientMsg = "Message from Client:{}".format(message)
-            clientIP  = "Client IP Address:{}".format(address)
-
-            print(clientMsg)
-            print(clientIP)
-            mysock.sendto(str.encode("A::\r\n"), clientIP)
-    mysock.close()    if not msg:
-            print(" err")
-        else:
-
-            TCPclientMsg = "Message from Client:{}".format(message)
-            clientIP  = "Client IP Address:{}".format(address)
+            TCPclientMsg = "Message from Client:{}".format(msg)
+            clientIP  = "Client IP Address:{}".format(addr)
 
             print(clientMsg)
             print(clientIP)
