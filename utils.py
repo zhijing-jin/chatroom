@@ -14,6 +14,19 @@ def sdbm_hash(instr):
     return hash & 0xffffffffffffffff
 
 
+def mproc_res(func, input_args):
+    '''
+    This is a multiprocess function where you execute the function with
+    every input in the input_list simutaneously.
+    @ return output_list: the list of outputs w.r.t. input_list
+    '''
+    from multiprocessing import Pool
+    pool = Pool(processes=1)
+    input_list = [input_args]
+    output_list = pool.map(func, input_list)
+    return output_list
+
+
 def multiproc():
     import time
     import multiprocessing
@@ -22,7 +35,6 @@ def multiproc():
         while True:
             time.sleep(5)
             show_time(text)
-
 
     jobs = []
     sublists = ['job_1', 'job_2']
@@ -33,11 +45,12 @@ def multiproc():
         time.sleep(1)
     worker('job_3')
 
+
 def show_time(what_happens='', cat_server=False, printout=True):
     import datetime
 
     disp = '\ttime: ' + \
-        datetime.datetime.now().strftime('%m%d%H%M-%S')
+           datetime.datetime.now().strftime('%m%d%H%M-%S')
     disp = disp + '\t' + what_happens if what_happens else disp
     if printout:
         print(disp)
@@ -60,5 +73,17 @@ def show_time(what_happens='', cat_server=False, printout=True):
     return curr_time
 
 
+def mproc_func(text):
+    import time
+    for i in range(5):
+        time.sleep(2)
+        show_time(text)
+    return i
+
+
 if __name__ == "__main__":
-    multiproc()
+    # multiproc()
+    input_args = 'hiii'
+    res = mproc_res(mproc_func, input_args)
+    print("[info] out of mproc")
+    print("[info] res")

@@ -13,33 +13,39 @@ import socket
 import datetime
 import sched
 import multiprocessing
+from multiprocessing import Process
 
 sys.path.append('.')
 
 from utils import sdbm_hash
-from build_socket import build_socket
-from interaction import query, parse_name, parse_rmsg, parse_memberships, parse_members, keepalive
+from build_socket import build_tcp_client, build_tcp_server, forward_link, retain_forward_link
+from interaction import query, parse_name, parse_rmsg, handle_join_rmsg, \
+    parse_memberships, parse_members, keepalive
 
-import multiprocessing
 from time import sleep
+
 #
 # Global variables
 #
-server = sys.argv[1]
-server = '127.0.0.1' if server == 'localhost' else server
+roomchat_ip = sys.argv[1]
+roomchat_ip = '127.0.0.1' if roomchat_ip == 'localhost' else roomchat_ip
 
-port = int(sys.argv[2])
-myport = int(sys.argv[3])
-sockfd = build_socket(server, port)
+roomchat_port = int(sys.argv[2])
+roomchat_sock = build_tcp_client(roomchat_ip, roomchat_port)
 
-myserver = '127.0.0.1'
+myip = '127.0.0.1'
 myport = int(sys.argv[3])
 mysock = None
 username = ""
 username_change = True
 roomname = ""
 
-multiproc =[]
+msgID = 0
+sock_peers = {'backward': [], 'forward': None}
+my_tcp_server = None
+my_tcp_conns = []
+
+multiproc = []
 
 
 # set_my_server()
@@ -51,7 +57,9 @@ multiproc =[]
 def do_User():
     global username, username_change
     if not username_change:
-        CmdWin.insert(1.0, "\n[Warn] You cannot change username because you have [Join]'ed. Your current name: {}".format(username))
+        CmdWin.insert(1.0,
+                      "\n[Warn] You cannot change username because you have [Join]'ed. Your current name: {}".format(
+                          username))
         return
     name = parse_name(userentry)
     if not name:
@@ -64,7 +72,7 @@ def do_User():
 
 def do_List():
     msg = 'L::\r\n'
-    rmsg = query(msg, sockfd)
+    rmsg = query(msg, roomchat_sock)
 
     groups = parse_rmsg(rmsg)
 
@@ -80,66 +88,81 @@ def do_List():
     # G:Name1:Name2:Name3::\r\n
 
 
-def do_Join():
-    global roomname, server, username_change, multiproc
-    roomname = parse_name(userentry)
+def do_Join(zihao=False):
+    global roomname, roomchat_ip, username_change, \
+        multiproc, msgID, sock_peers, \
+        my_tcp_conns
+    name = parse_name(userentry)
 
     if not username:
         CmdWin.insert(1.0, "\n[Error] Username cannot be empty. Pls input username and press [User].")
         return
 
-    if not roomname:
+    if not name:
         CmdWin.insert(1.0, "\n[Error] roomname cannot be empty.")
     else:
-        msg = 'J:{roomname}:{username}:{userIP}:{port}::\r\n'. \
+        roomname = name
+
+        msg_check_mem = 'J:{roomname}:{username}:{userIP}:{port}::\r\n'. \
             format(roomname=roomname, username=username,
-                   userIP=myserver, port=myport)
-
-        MsgWin.insert(1.0, "\n[JOIN] sent msg: {}".format(msg))
-        rmsg = query(msg, sockfd)
-
-        if rmsg[0] != 'F':
-            outstr = "\n[Join] roomname: " + roomname
-            CmdWin.insert(1.0, outstr)
-        MsgWin.insert(1.0, "\n[Join] received msg: {}".format(rmsg))
+                   userIP=myip, port=myport)
+        rmsg = query(msg_check_mem, roomchat_sock)
+        handle_join_rmsg(rmsg, roomname, CmdWin, MsgWin)
 
         # after joining
         username_change = False
 
-        p = multiprocessing.Process(target=keepalive, args=(msg, sockfd, username,))
+        # keepalive
+        p = Process(target=keepalive, args=(msg_check_mem, roomchat_sock, username,))
         p.start()
         multiproc += [p]
         print('[Info] out of keepalive')
 
+        if zihao:
+            ## FIXME: if mysock is created inside the other process, mysock may still be None.
+            if mysock == None:
+                print("starts multi process")
+                p = Process(target=set_my_server)  # , args=(shared_list,))
+                p.start()
+                multiproc += [p]
+            else:
+                print("we have established the server!")
+            # set_my_server(1)
+
+        myHashID = sdbm_hash("{}{}{}".format(username, myip, myport))
+
+        # make my TCP server
+        p = Process(target=build_tcp_server,
+                    args=(myip, myport, msg_check_mem, roomchat_sock,))
+        p.start()
+        multiproc += [p]
+
+        print('[Info] Entering forward link establishment')
         gList = parse_members(rmsg)
-        myHashID = sdbm_hash("{}{}{}".format(username, server, myport))
+        sock_peers, msgID, my_tcp_conns = \
+            forward_link(gList, myHashID, sock_peers, roomname,
+                         username, myip, myport, msgID, MsgWin, my_tcp_conns)
 
-        ix = [ix for ix, item in enumerate(gList) if item.HashID == myHashID][0]
-        start = ix + 1
-        # import pdb; pdb.set_trace()
+        # TODO: for the following process, I need to reuse `msgID` and `my_tcp_conns`
+        p = Process(target=retain_forward_link,
+                    args=(msg_check_mem, roomchat_sock, myHashID, sock_peers,
+                            roomname, username, myip, myport, msgID, MsgWin,
+                            my_tcp_conns,))
+        p.start()
+        multiproc += [p]
 
-        # if len(gList) > start:
-        #     while gList[start].HashID != myHashID:
-        #         pass
+        import pdb;
+        pdb.set_trace()
 
-        ## FIXME: if mysock is created inside the other process, mysock may still be None.
-        if mysock == None:
-            print("starts multi process")
-            p = multiprocessing.Process(target=set_my_server) #, args=(shared_list,))
-            p.start()
-            multiproc += [p]
-        else:
-            print("we have established the server!")
-        #set_my_server(1)
 
-def set_my_server(): #shared_list):
+def set_my_server():  # shared_list):
     print("in server")
 
     global mysock
-    address = (myserver, myport)
+    address = (myip, myport)
     mysock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
-        mysock.bind((myserver, myport))
+        mysock.bind((myip, myport))
     except socket.error as emsg:
         print("Socket bind error: ", emsg)
         sys.exit(1)
@@ -179,8 +202,8 @@ def do_Poke():
 
     # if empty, provide list; if not empty check if it's inside the list
     msg = 'J:{roomname}:{username}:{userIP}:{port}::\r\n'.format(roomname=roomname, username=username,
-           userIP=myserver, port=myport)
-    rmsg = query(msg, sockfd)
+                                                                 userIP=myip, port=myport)
+    rmsg = query(msg, roomchat_sock)
     membermsg = parse_memberships(rmsg)
     memberships = membermsg[1::3]
 
@@ -201,12 +224,13 @@ def do_Poke():
         msg = 'K:{roomname}:{username}::\r\n'.format(roomname=roomname, username=username)
         MsgWin.insert(1.0, "\n The message you are sending is " + msg)
         idx = membermsg.index(targetname)
-        print("index of ", targetname, " is ", str.encode(msg), (membermsg[idx+1], int(membermsg[idx+2])), flush=False)
-        s.sendto(str.encode(msg), (membermsg[idx+1], int(membermsg[idx+2])))
+        print("index of ", targetname, " is ", str.encode(msg),
+              (membermsg[idx + 1], int(membermsg[idx + 2])), flush=False)
+        s.sendto(str.encode(msg), (membermsg[idx + 1], int(membermsg[idx + 2])))
         s.settimeout(2);
-        rmsg = s.recvfrom(1000) #.decode("utf-8")
+        rmsg = s.recvfrom(1000)  # .decode("utf-8")
         if not rmsg:
-            print("failure",flush=False)
+            print("failure", flush=False)
             CmdWin.insert(1.0, "\n[Error] Poke failure")
         elif "A::\r\n" == rmsg[0].decode("utf-8"):
             print("success", flush=False)
@@ -215,18 +239,24 @@ def do_Poke():
             CmdWin.insert(1.0, "\n[Error] Poke failure")
 
 
-
 def do_Quit():
+    global my_tcp_server, my_tcp_conns
     CmdWin.insert(1.0, "\nPress Quit")
-    sockfd.close()
+    roomchat_sock.close()
     print("[Info] Closed socket")
+
+    if my_tcp_server is not None:
+        my_tcp_server.close()
+        for conn in my_tcp_conns:
+            conn.close()
+        print("[Info] Closed tcp_conn, tcp_server")
+
     for p in multiproc:
         p.terminate()
         p.join()
     print("[Info] Closed multiprocessing")
 
     sys.exit(0)
-
 
 
 # manager = multiprocessing.Manager()
@@ -270,8 +300,6 @@ Butt06.pack(side=LEFT, padx=8, pady=8)
 Butt05 = Button(topmidframe, width='6', relief=RAISED,
                 text="Quit", command=do_Quit)
 Butt05.pack(side=LEFT, padx=8, pady=8)
-
-
 
 # Lower Middle Frame for User input
 lowmidframe = Frame(win, relief=RAISED, borderwidth=1)
