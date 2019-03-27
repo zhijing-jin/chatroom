@@ -5,7 +5,12 @@ Stage one includes the following functions:
 - `Zihao` do_List()
 - `Zhijing` part of the do_Join() function, which involves the interactions between the P2PChat program and
 the Room server in handling the JOIN request and the subsequent JOIN requests in the KEEPALIVE procedure. To show that the program has successfully joined the chatroom, it simply displays the members’ info to the Command Window.
-- do_Poke()
+- `Zihao` do_Poke()
+
+## Stage Two (by Mar 28)
+- `Zhijing` do_Join()
+- do_Send()
+- `Zhijing` do_Quit() 
 
 ## Note
-Please check the code. If a function is empty, anyone can start coding it. If you already started coding a function, claim the function by putting your name beside it.
+In `do_Join()`, sometimes there is an error message in parse_members(). Need to fix.
