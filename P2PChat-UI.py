@@ -102,22 +102,23 @@ def do_Join(zihao=False):
         CmdWin.insert(1.0, "\n[Error] roomname cannot be empty.")
     else:
         roomname = name
-
+        # Step 1. join the chatroom, by sending msg to chatroom app
         msg_check_mem = 'J:{roomname}:{username}:{userIP}:{port}::\r\n'. \
             format(roomname=roomname, username=username,
                    userIP=myip, port=myport)
         rmsg = query(msg_check_mem, roomchat_sock)
         handle_join_rmsg(rmsg, roomname, CmdWin, MsgWin)
 
-        # after joining
+        # after joining, users cannot change names
         username_change = False
 
-        # keepalive
+        # Step 2. keepalive, by sending JOIN msg to the chatroom app every 20 sec
         p = Process(target=keepalive, args=(msg_check_mem, roomchat_sock, username,))
         p.start()
         multiproc += [p]
         print('[Info] out of keepalive')
 
+        # Step 3. this is Zihao's poke function, enabling do_Poke()
         if zihao:
             ## FIXME: if mysock is created inside the other process, mysock may still be None.
             if mysock == None:
@@ -131,18 +132,21 @@ def do_Join(zihao=False):
 
         myHashID = sdbm_hash("{}{}{}".format(username, myip, myport))
 
-        # make my TCP server
+        # Step 4. start my TCP server, as the server for other users to CONNECT to in the chatroom
         p = Process(target=build_tcp_server,
                     args=(myip, myport, msg_check_mem, roomchat_sock,))
         p.start()
         multiproc += [p]
 
+        # Step 5. start a TCP client, to CONNECT another user's TCP server in the chatroom
         print('[Info] Entering forward link establishment')
         gList = parse_members(rmsg)
         sock_peers, msgID, my_tcp_conns = \
             forward_link(gList, myHashID, sock_peers, roomname,
                          username, myip, myport, msgID, MsgWin, my_tcp_conns)
 
+        # update my TCP client when a relevant user terminates
+        # (when the user that you CONNECT to terminates, you need to connect to another TCP server instead)
         # TODO: for the following process, I need to reuse `msgID` and `my_tcp_conns`
         p = Process(target=retain_forward_link,
                     args=(msg_check_mem, roomchat_sock, myHashID, sock_peers,
