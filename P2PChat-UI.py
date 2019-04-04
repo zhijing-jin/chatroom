@@ -21,7 +21,7 @@ sys.path.append('.')
 from utils import sdbm_hash
 from build_socket import build_tcp_client, forward_link # retain_forward_link # build_tcp_server,
 from interaction import query, parse_name, parse_rmsg, handle_join_rmsg, \
-	parse_memberships, parse_members, keepalive
+	parse_memberships, parse_members, parse_send_message, keepalive
 
 from time import sleep
 
@@ -41,10 +41,11 @@ username = ""
 roomname = ""
 
 msgID = 0
+HID_msgID_dict = {}
 sock_peers = {'backward': [], 'forward': None} # backward holds a list of hasIDs [hashID], forward holds hashID where this p2p is pointing at
 my_tcp_server = None
 my_tcp_conns = []
-backward_link = [] #backward links
+backwardlink = [] #backward links
 forwardlink = [] #forward links
 multiproc = [] # a global list to manage the multi processing
 
@@ -99,7 +100,7 @@ def do_List():
 	msg = 'L::\r\n'
 	rmsg = query(msg, roomchat_sock)
 
-	groups = parse_rmsg(rmsg)
+	groups = parse_rmsg(rmsg,prefix="G:")
 
 	if groups == ['']:
 		CmdWin.insert(1.0, "\n[List] No active chatrooms")
@@ -116,7 +117,7 @@ def do_List():
 def do_Join():
 	global roomname, roomchat_ip, \
 		multiproc, msgID, sock_peers, \
-		my_tcp_conns
+		my_tcp_conns, forwardlink
 	name = parse_name(userentry)
 
 	if not username:
@@ -145,20 +146,7 @@ def do_Join():
 		multiproc += [p]
 		print('[Info] out of keepalive')
 
-		# # Step 3. this is Zihao's poke function, enabling do_Poke()
-		# if zihao:
-		#     ## FIXME: if mysock is created inside the other process, mysock may still be None.
-		#     if mysock == None:
-		#         print("starts multi process")
-		#         p = Process(target=set_my_server)  # , args=(shared_list,))
-		#         p.start()
-		#         multiproc += [p]
-		#     else:
-		#         print("we have established the server!")
-		#     # set_my_server(1)
-
 		myHashID = sdbm_hash("{}{}{}".format(username, myip, myport))
-		print("hi I am here", flush=False)
 
 		# Step 4. start my TCP server, as the server for other users to CONNECT to in the chatroom
 		p = Process(target=build_tcp_server,
@@ -169,7 +157,7 @@ def do_Join():
 		# Step 5. start a TCP client, to CONNECT another user's TCP server in the chatroom
 		print('[Info] Entering forward link establishment')
 		gList = parse_members(rmsg)
-		sock_peers, msgID, my_tcp_conns = \
+		sock_peers, get, my_tcp_conns, forwardlink = \
 			forward_link(gList, myHashID, sock_peers, roomname,
 						 username, myip, myport, msgID, MsgWin, my_tcp_conns)
 
@@ -188,14 +176,15 @@ def do_Join():
 
 
 def do_Send():
-	print('my_tcp_conns', my_tcp_conns)
-	print('sock_peers', sock_peers)
+	global msgID
+	print('forwardlink', forwardlink)
+	print('backwardlink', backwardlink)
 	# print()
 	if not username:
 		CmdWin.insert(1.0, "\n[Error] You must have a username first.")
 		return
 
-	if not roomname:
+	if not check_join:
 		CmdWin.insert(1.0, "\n[Error] You must join a chatroom first.")
 		return
 
@@ -206,8 +195,15 @@ def do_Send():
 
 	CmdWin.insert(1.0, "\nPress Send")
 
-	# s = socket.socket()
-	# msg = 'K:{roomname}:{username}::\r\n'.format(roomname=roomname, username=username)
+	originHID = sdbm_hash("{}{}{}".format(username, myip, myport))
+
+	msgID += 1
+	msg = 'T:{roomname}:{originHID}:{username}:{msgID}:{msgLength}:{content}::\r\n'.format(roomname=roomname, originHID=originHID, username=username, msgID=msgID, msgLength=len(sendmsg), content=sendmsg)
+	MsgWin.insert(1.0, "\n{username} : {content}".format(username=username, content=sendmsg))
+	if forwardlink:
+		forwardlink.send(str.encode(msg))
+	for bwl in backwardlink:
+		bwl.send(str.encode(msg))
 	# MsgWin.insert(1.0, "\n The message you are sending is " + msg)
 	# idx = membermsg.index(targetname)
 	# print("index of ", targetname, " is ", str.encode(msg),
@@ -267,10 +263,23 @@ def do_Poke():
 		# global mysock
 		# if not mysock:
 		#     print("rediculous!")\
+		rmsg = query(msg, roomchat_sock)
+		membermsg = parse_memberships(rmsg)
+		memberships = membermsg[1::3]
+
+		try:
+			idx = membermsg.index(targetname)
+		except:
+			for member in memberships:
+				if member != username:
+					CmdWin.insert(1.0, "\n    {}".format(member))
+			CmdWin.insert(1.0, "\n[Poke] That member has left the chat room. To whom you want to send the poke?")
+			return
+
 		s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		msg = 'K:{roomname}:{username}::\r\n'.format(roomname=roomname, username=username)
 		MsgWin.insert(1.0, "\n The message you are sending is " + msg)
-		idx = membermsg.index(targetname)
+
 		print("index of ", targetname, " is ", str.encode(msg),
 			  (membermsg[idx + 1], int(membermsg[idx + 2])), flush=False)
 
@@ -312,7 +321,7 @@ def do_Quit():
 	sys.exit(0)
 
 def build_tcp_server(msg_check_mem):
-	global myip, myport, roomchat_sock, backward_link, MsgWin, CmdWin
+	global myip, myport, roomchat_sock, backwardlink, MsgWin, CmdWin, HID_msgID_dict
 	# Step 1. create socket and bind
 	sockfd = socket.socket()
 	udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -349,6 +358,7 @@ def build_tcp_server(msg_check_mem):
 
 		# if has incoming activities
 		if Rready:
+			print('I am very busy')
 			# for each socket in the READ ready list
 			for sd in Rready:
 				if sd == udp:
@@ -375,11 +385,10 @@ def build_tcp_server(msg_check_mem):
 						print("[build_tcp_server] Socket accept error: ", emsg)
 						break
 
+
 					# add the backward link to connections
-					print("before accept", backward_link)
-					backward_link += [conn]
+					backwardlink += [conn]
 					RList += [conn]
-					print("after accept", backward_link)
 
 					# print out peer socket address information
 					print("[build_tcp_server] Connection established. Remote client info:", addr)
@@ -418,8 +427,36 @@ def build_tcp_server(msg_check_mem):
 						print("[build_tcp_server] Connection established with {}:{}".format(*rmsg[2:4]))
 					else:
 						break
-				# else:
-				# 	print('I am in tcp chatting')
+				else:
+					print('I am in tcp chatting', sd)
+					rmsg = sd.recv(1000)
+					if rmsg:
+						print("Got a message!!", rmsg)
+						msg_split, content = parse_send_message(rmsg.decode("utf-8"))
+						print(msg_split, content)
+						if msg_split: # otherwise the msg format is incorrect
+							origin_roomname = msg_split[0]
+							originHID = msg_split[1]
+							origin_username = msg_split[2]
+							msgID = msg_split[3]
+							print(origin_roomname, originHID, origin_username, msgID, content)
+
+							if origin_roomname != roomname:
+								print('this is not my room')
+							elif originHID in HID_msgID_dict:
+								if HID_msgID_dict[originHID] == msgID:
+									print('we have recorded this message')
+								else:
+									HID_msgID_dict[originHID] = msgID
+									print('this is a new message', content)
+							else:
+								#FIXME if I don't know this person, then something should happen
+								HID_msgID_dict[originHID] = msgID
+								print('{origin_username} : {content}'.format(origin_username, content))
+						else:
+							print('incorrect msg format')
+					else:
+						print("A client connection is broken!!")
 
 
 	# TODO: is this the right termination?
@@ -427,7 +464,7 @@ def build_tcp_server(msg_check_mem):
 	conn.close()
 
 def retain_forward_link(msg_check_mem, myHashID, msgID):
-	global my_tcp_conns, roomname, username, myip, myport, MsgWin, roomchat_sock, sock_peers, forward_link
+	global my_tcp_conns, roomname, username, myip, myport, MsgWin, roomchat_sock, sock_peers, forwardlink
 	# get current member list
 	rmsg_mem = query(msg_check_mem, roomchat_sock)
 	roomhash = rmsg_mem[0]
@@ -449,7 +486,7 @@ def retain_forward_link(msg_check_mem, myHashID, msgID):
 			# if the my forward server is no longer in the member list,
 			# make a new forward link
 			if sock_peers['forward'] not in mem_hashes:
-				sock_peers, msgID, my_tcp_conns = forward_link(mems, myHashID, sock_peers,
+				sock_peers, msgID, my_tcp_conns, forwardlink = forward_link(mems, myHashID, sock_peers,
 															   roomname, username, myip, myport, msgID, MsgWin,
 															   my_tcp_conns)
 

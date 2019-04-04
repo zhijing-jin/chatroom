@@ -25,150 +25,6 @@ def build_tcp_client(server_ip, server_port):
 
 
 
-# def build_tcp_server(server_ip, server_port, msg_check_mem, sock_chatroom, backward_link, MsgWin, CmdWin):
-# 	# Step 1. create socket and bind
-# 	sockfd = socket.socket()
-# 	udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-#
-# 	try:
-# 		sockfd.bind(('', server_port))
-# 		udp.bind(('', server_port))
-# 	except socket.error as emsg:
-# 		print("[build_tcp_server] Socket bind error: ", emsg)
-# 		sys.exit(1)
-#
-# 	print("[build_tcp_server] SERVER established at {}:{}".format(server_ip, server_port))
-#
-# 	# Step 2. listen
-# 	sockfd.listen(5)
-#
-# 	# add the listening socket to the READ socket list
-# 	RList = [sockfd, udp]
-#
-# 	# create an empty WRITE socket list
-# 	WList = []
-#
-# 	while True:
-# 		# use select to wait for any incoming connection requests or
-# 		# incoming messages or 10 seconds
-# 		try:
-# 			Rready, Wready, Eready = select.select(RList, [], [], 10)
-# 		except select.error as emsg:
-# 			print("At select, caught an exception:", emsg)
-# 			sys.exit(1)
-# 		except KeyboardInterrupt:
-# 			print("At select, caught the KeyboardInterrupt")
-# 			sys.exit(1)
-#
-# 		# if has incoming activities
-# 		if Rready:
-# 			# for each socket in the READ ready list
-# 			for sd in Rready:
-# 				if sd == udp:
-# 					print('I am in udp')
-# 					msg, addr = sd.recvfrom(1024)
-# 					print("we receiver the msg", msg, flush=False)
-#
-# 					if not msg:
-# 						print("[Error] chat server broken")
-# 					else:
-# 						print(msg, addr, flush=False)
-# 						rmsg = parse_rmsg(msg.decode("utf-8"), prefix="K:", suffix="::\r\n")
-# 						MsgWin.insert(1.0, "\n~~~~~~~~~~~~~{}~~~~~~~~~~~~~~".format(rmsg[1]))
-#
-# 						print("You are poked by {}!!".format(rmsg[1]))
-# 						sd.sendto(str.encode("A::\r\n"), addr)
-# 				elif sd == sockfd:
-# 					print('I am in tcp establishing')
-#
-# 				# Step 3. accept new connection
-# 					try:
-# 						conn, addr = sd.accept()
-# 					except socket.error as emsg:
-# 						print("[build_tcp_server] Socket accept error: ", emsg)
-# 						break
-#
-# 					# add the backward link to connections
-# 					print("before accept", backward_link)
-# 					backward_link += [conn]
-# 					RList += [conn]
-# 					print("after accept", backward_link)
-#
-# 					# print out peer socket address information
-# 					print("[build_tcp_server] Connection established. Remote client info:", addr)
-#
-# 					# Step 4. upon new connection, receive message
-# 					try:
-# 						rmsg = conn.recv(100).decode("utf-8")
-# 						print("[build_tcp_server] tried rmsg: {}".format(rmsg))
-# 					except socket.error as emsg:
-# 						print("Socket recv error: ", emsg)
-# 						break
-#
-# 					# Step 5. enable peer-to-peer handshake
-# 					if rmsg.startswith('P:'):
-# 						print("[build_tcp_server] received: {}".format(rmsg))
-#
-# 						rmsg = parse_rmsg(rmsg, prefix="P:", suffix="::\r\n")
-# 						msgID = rmsg[-1]
-#
-# 						# if the msg is not from a peer in the same chatroom
-# 						# refuse it by replying 'F:not_member_msg::\r\n'
-# 						# else, reply with 'S:{msgID}::\r\n'
-# 						client_hash = sdbm_hash("{}{}{}".format(*rmsg[1:]))
-# 						rmsg_mems = query(msg_check_mem, sock_chatroom)
-# 						gList = parse_members(rmsg_mems)
-# 						mem_hashes = set(mem.HashID for mem in gList)
-#
-# 						if not client_hash in mem_hashes:
-# 							print("[Error] Detected non-member connection. Closing.")
-# 							msg = 'F:not_member_msg::\r\n'.format(msgID=msgID)
-# 							conn.send(str.encode(msg))
-# 							# break
-#
-# 						msg = 'S:{msgID}::\r\n'.format(msgID=msgID)
-# 						conn.send(str.encode(msg))
-# 						print("[build_tcp_server] Connection established with {}:{}".format(*rmsg[2:4]))
-# 					else:
-# 						break
-# 				else:
-# 					print('I am in tcp chatting')
-#
-#
-# 	# TODO: is this the right termination?
-# 	sockfd.close()
-# 	conn.close()
-
-
-# def retain_forward_link(msg_check_mem, roomchat_sock, myHashID, sock_peers,
-# 						roomname, username, myip, myport, msgID, MsgWin,
-# 						my_tcp_conns):
-# 	# get current member list
-# 	rmsg_mem = query(msg_check_mem, roomchat_sock)
-# 	roomhash = rmsg_mem[0]
-#
-# 	while True:
-# 		rmsg_mem = query(msg_check_mem, roomchat_sock)
-#
-# 		# if the roomhash is changed, update the member list
-# 		if roomhash != rmsg_mem[0]:
-# 			roomhash = rmsg_mem[0]
-# 			try:
-# 				mems = parse_members(rmsg_mem)
-# 			except AssertionError:
-# 				print('[Error] pls fix here')
-# 				import pdb;
-# 				pdb.set_trace()
-# 			mem_hashes = set(mem.HashID for mem in mems)
-#
-# 			# if the my forward server is no longer in the member list,
-# 			# make a new forward link
-# 			if sock_peers['forward'] not in mem_hashes:
-# 				sock_peers, msgID, my_tcp_conns = forward_link(mems, myHashID, sock_peers,
-# 															   roomname, username, myip, myport, msgID, MsgWin,
-# 															   my_tcp_conns)
-
-
 def forward_link(gList, myHashID, sock_peers,
 				 roomname, username, myip, myport, msgID, MsgWin,
 				 my_tcp_conns):
@@ -189,6 +45,8 @@ def forward_link(gList, myHashID, sock_peers,
 	my_gList_ix = [my_gList_ix for my_gList_ix, item in enumerate(gList)
 				   if item.HashID == myHashID][0]
 	start = (my_gList_ix + 1) % len(gList)
+
+	forwardlink = None
 
 	# this while loop finds ONE peer to establish a forward link to
 	while gList[start].HashID != myHashID:
@@ -217,6 +75,7 @@ def forward_link(gList, myHashID, sock_peers,
 
 					msgID += 1
 					my_tcp_conns += [my_tcp_client]
+					forwardlink = my_tcp_client
 					print("[Info] sock_peers['forward']:", gList[start].name)
 					break
 				elif rmsg.startswith('F:not_member_msg::\r\n'):
@@ -225,7 +84,7 @@ def forward_link(gList, myHashID, sock_peers,
 					start = (start + 1) % len(gList)
 			else:
 				start = (start + 1) % len(gList)
-	return sock_peers, msgID, my_tcp_conns
+	return sock_peers, msgID, my_tcp_conns, forwardlink
 
 # def build_tcp_server(server_ip, server_port, msg_check_mem, sock_chatroom):
 #     # Step 1. create socket and bind
