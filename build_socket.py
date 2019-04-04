@@ -9,7 +9,7 @@ from interaction import parse_rmsg, query, parse_members
 
 
 def build_tcp_client(server_ip, server_port):
-    # create socket and connect to Comm_pipe
+    # create socket and connect to a server
     try:
         sockfd = socket.socket()
         sockfd.connect((server_ip, server_port))

@@ -37,15 +37,15 @@ myip = '127.0.0.1'
 myport = int(sys.argv[3])
 mysock = None
 username = ""
-username_change = True
+username_change = True #FIXME: this is equivalent to do a roomname check?
 roomname = ""
 
 msgID = 0
-sock_peers = {'backward': [], 'forward': None}
+sock_peers = {'backward': [], 'forward': None} # backward holds a list of hasIDs [hashID], forward holds hashID where this p2p is pointing at
 my_tcp_server = None
-my_tcp_conns = []
+my_tcp_conns = [] #
 
-multiproc = []
+multiproc = [] # a global list to manage the multi processing
 
 
 # set_my_server()
@@ -131,6 +131,7 @@ def do_Join(zihao=False):
             # set_my_server(1)
 
         myHashID = sdbm_hash("{}{}{}".format(username, myip, myport))
+        print("hi I am here", flush=False)
 
         # Step 4. start my TCP server, as the server for other users to CONNECT to in the chatroom
         p = Process(target=build_tcp_server,
@@ -190,7 +191,29 @@ def set_my_server():  # shared_list):
 
 
 def do_Send():
+    print(my_tcp_conns)
+    return
+
+
+    if not username:
+        CmdWin.insert(1.0, "\n[Error] You must have a username first.")
+        return
+
+    if not roomname:
+        CmdWin.insert(1.0, "\n[Error] You must join a chatroom first.")
+        return
+
+    sendmsg = userentry.get()
+    if not sendmsg:
+        CmdWin.insert(1.0, "\n[Error] Empty message cannot be sent.")
+        return
+
     CmdWin.insert(1.0, "\nPress Send")
+
+
+
+
+
 
 
 def do_Poke():
