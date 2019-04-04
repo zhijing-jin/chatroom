@@ -25,12 +25,14 @@ def build_tcp_client(server_ip, server_port):
 
 
 
-def build_tcp_server(server_ip, server_port, msg_check_mem, sock_chatroom):
+def build_tcp_server(server_ip, server_port, msg_check_mem, sock_chatroom, MsgWin, CmdWin):
 	# Step 1. create socket and bind
 	sockfd = socket.socket()
+	udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
 	try:
 		sockfd.bind(('', server_port))
+		udp.bind(('', server_port))
 	except socket.error as emsg:
 		print("[build_tcp_server] Socket bind error: ", emsg)
 		sys.exit(1)
@@ -41,7 +43,7 @@ def build_tcp_server(server_ip, server_port, msg_check_mem, sock_chatroom):
 	sockfd.listen(5)
 
 	# add the listening socket to the READ socket list
-	RList = [sockfd]
+	RList = [sockfd, udp]
 
 	# create an empty WRITE socket list
 	WList = []
@@ -62,51 +64,68 @@ def build_tcp_server(server_ip, server_port, msg_check_mem, sock_chatroom):
 		if Rready:
 			# for each socket in the READ ready list
 			for sd in Rready:
+				if sd == udp:
+					print(MsgWin)
+					print('I am in udp')
+					msg, addr = sd.recvfrom(1024)
+					print("we receiver the msg", msg, flush=False)
+
+					if not msg:
+						print("[Error] chat server broken")
+					else:
+						print(msg, addr, flush=False)
+						rmsg = parse_rmsg(msg.decode("utf-8"), prefix="K:", suffix="::\r\n")
+						MsgWin.insert(1.0, "\n~~~~~~~~~~~~~{}~~~~~~~~~~~~~~".format(rmsg[1]))
+
+						print("You are poked by {}!!".format(rmsg[1]))
+						sd.sendto(str.encode("A::\r\n"), addr)
+				elif sd == sockfd:
+					print('I am in tcp')
 
 				# Step 3. accept new connection
-				try:
-					conn, addr = sd.accept()
-				except socket.error as emsg:
-					print("[build_tcp_server] Socket accept error: ", emsg)
-					break
+					try:
+						conn, addr = sd.accept()
+					except socket.error as emsg:
+						print("[build_tcp_server] Socket accept error: ", emsg)
+						break
 
-				# print out peer socket address information
-				print("[build_tcp_server] Connection established. Remote client info:", addr)
+					# print out peer socket address information
+					print("[build_tcp_server] Connection established. Remote client info:", addr)
 
-				# Step 4. upon new connection, receive message
-				try:
-					rmsg = conn.recv(100).decode("utf-8")
-					print("[build_tcp_server] tried rmsg: {}".format(rmsg))
-				except socket.error as emsg:
-					print("Socket recv error: ", emsg)
-					break
+					# Step 4. upon new connection, receive message
+					try:
+						rmsg = conn.recv(100).decode("utf-8")
+						print("[build_tcp_server] tried rmsg: {}".format(rmsg))
+					except socket.error as emsg:
+						print("Socket recv error: ", emsg)
+						break
 
-				# Step 5. enable peer-to-peer handshake
-				if rmsg.startswith('P:'):
-					print("[build_tcp_server] received: {}".format(rmsg))
+					# Step 5. enable peer-to-peer handshake
+					if rmsg.startswith('P:'):
+						print("[build_tcp_server] received: {}".format(rmsg))
 
-					rmsg = parse_rmsg(rmsg, prefix="P:", suffix="::\r\n")
-					msgID = rmsg[-1]
+						rmsg = parse_rmsg(rmsg, prefix="P:", suffix="::\r\n")
+						msgID = rmsg[-1]
 
-					# if the msg is not from a peer in the same chatroom
-					# refuse it by replying 'F:not_member_msg::\r\n'
-					# else, reply with 'S:{msgID}::\r\n'
-					client_hash = sdbm_hash("{}{}{}".format(*rmsg[1:]))
-					rmsg_mems = query(msg_check_mem, sock_chatroom)
-					gList = parse_members(rmsg_mems)
-					mem_hashes = set(mem.HashID for mem in gList)
+						# if the msg is not from a peer in the same chatroom
+						# refuse it by replying 'F:not_member_msg::\r\n'
+						# else, reply with 'S:{msgID}::\r\n'
+						client_hash = sdbm_hash("{}{}{}".format(*rmsg[1:]))
+						rmsg_mems = query(msg_check_mem, sock_chatroom)
+						gList = parse_members(rmsg_mems)
+						mem_hashes = set(mem.HashID for mem in gList)
 
-					if not client_hash in mem_hashes:
-						print("[Error] Detected non-member connection. Closing.")
-						msg = 'F:not_member_msg::\r\n'.format(msgID=msgID)
+						if not client_hash in mem_hashes:
+							print("[Error] Detected non-member connection. Closing.")
+							msg = 'F:not_member_msg::\r\n'.format(msgID=msgID)
+							conn.send(str.encode(msg))
+							# break
+
+						msg = 'S:{msgID}::\r\n'.format(msgID=msgID)
 						conn.send(str.encode(msg))
-						# break
-
-					msg = 'S:{msgID}::\r\n'.format(msgID=msgID)
-					conn.send(str.encode(msg))
-					print("[build_tcp_server] Connection established with {}:{}".format(*rmsg[2:4]))
-				else:
-					break
+						print("[build_tcp_server] Connection established with {}:{}".format(*rmsg[2:4]))
+					else:
+						break
 
 	# TODO: is this the right termination?
 	sockfd.close()

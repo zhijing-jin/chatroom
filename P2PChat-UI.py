@@ -47,7 +47,7 @@ my_tcp_conns = [] #
 multiproc = [] # a global list to manage the multi processing
 
 
-# set_my_server()
+
 
 #
 # Functions to handle user input
@@ -111,7 +111,7 @@ def do_List():
     # G:Name1:Name2:Name3::\r\n
 
 
-def do_Join(zihao=False):
+def do_Join():
     global roomname, roomchat_ip, \
         multiproc, msgID, sock_peers, \
         my_tcp_conns
@@ -143,24 +143,24 @@ def do_Join(zihao=False):
         multiproc += [p]
         print('[Info] out of keepalive')
 
-        # Step 3. this is Zihao's poke function, enabling do_Poke()
-        if zihao:
-            ## FIXME: if mysock is created inside the other process, mysock may still be None.
-            if mysock == None:
-                print("starts multi process")
-                p = Process(target=set_my_server)  # , args=(shared_list,))
-                p.start()
-                multiproc += [p]
-            else:
-                print("we have established the server!")
-            # set_my_server(1)
+        # # Step 3. this is Zihao's poke function, enabling do_Poke()
+        # if zihao:
+        #     ## FIXME: if mysock is created inside the other process, mysock may still be None.
+        #     if mysock == None:
+        #         print("starts multi process")
+        #         p = Process(target=set_my_server)  # , args=(shared_list,))
+        #         p.start()
+        #         multiproc += [p]
+        #     else:
+        #         print("we have established the server!")
+        #     # set_my_server(1)
 
         myHashID = sdbm_hash("{}{}{}".format(username, myip, myport))
         print("hi I am here", flush=False)
 
         # Step 4. start my TCP server, as the server for other users to CONNECT to in the chatroom
         p = Process(target=build_tcp_server,
-                    args=(myip, myport, msg_check_mem, roomchat_sock,))
+                    args=(myip, myport, msg_check_mem, roomchat_sock, MsgWin, CmdWin))
         p.start()
         multiproc += [p]
 
@@ -184,38 +184,39 @@ def do_Join(zihao=False):
         # import pdb;
         # pdb.set_trace()
 
-
-def set_my_server():  # shared_list):
-    print("in server")
-
-    global mysock
-    address = (myip, myport)
-    mysock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        mysock.bind((myip, myport))
-    except socket.error as emsg:
-        print("Socket bind error: ", emsg)
-        sys.exit(1)
-
-    # start the main loop
-    while (True):
-
-        msg, addr = mysock.recvfrom(1024)
-        print("we receiver the msg", msg, flush=False)
-
-        if not msg:
-            print("[Error] chat server broken")
-        else:
-            print(msg, addr, flush=False)
-            rmsg = parse_rmsg(msg.decode("utf-8"), prefix="K:", suffix="::\r\n")
-            MsgWin.insert(1.0, "\n~~~~~~~~~~~~~{}~~~~~~~~~~~~~~".format(rmsg[1]))
-
-            print("You are poked by {}!!".format(rmsg[1]))
-            mysock.sendto(str.encode("A::\r\n"), addr)
-    mysock.close()
+#
+# def set_my_server():  # shared_list):
+#     print("in server")
+#
+#     global mysock
+#     address = (myip, myport)
+#     mysock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#     try:
+#         mysock.bind((myip, myport))
+#     except socket.error as emsg:
+#         print("Socket bind error: ", emsg)
+#         sys.exit(1)
+#
+#     # start the main loop
+#     while (True):
+#
+#         msg, addr = mysock.recvfrom(1024)
+#         print("we receiver the msg", msg, flush=False)
+#
+#         if not msg:
+#             print("[Error] chat server broken")
+#         else:
+#             print(msg, addr, flush=False)
+#             rmsg = parse_rmsg(msg.decode("utf-8"), prefix="K:", suffix="::\r\n")
+#             MsgWin.insert(1.0, "\n~~~~~~~~~~~~~{}~~~~~~~~~~~~~~".format(rmsg[1]))
+#
+#             print("You are poked by {}!!".format(rmsg[1]))
+#             mysock.sendto(str.encode("A::\r\n"), addr)
+#     mysock.close()
 
 
 def do_Send():
+    print(MsgWin)
     if not username:
         CmdWin.insert(1.0, "\n[Error] You must have a username first.")
         return
