@@ -7,6 +7,9 @@
 # and str(Port) to form a string that be the input
 # to this hash function
 #
+import asyncio
+
+
 def sdbm_hash(instr):
     hash = 0
     for c in instr:
@@ -76,14 +79,62 @@ def show_time(what_happens='', cat_server=False, printout=True):
 def mproc_func(text):
     import time
     for i in range(5):
-        time.sleep(2)
+        time.sleep(10)
         show_time(text)
     return i
 
+async def async_func(text):
+    for i in range(5):
+        await asyncio.sleep(1)
+        show_time(text)
+    return text
+
+def asy2():
+    import asyncio
+    import time
+
+    start = time.time()
+    loop = asyncio.get_event_loop()
+    tasks = [
+        asyncio.ensure_future(async_func("A")),
+        asyncio.ensure_future(async_func("B")),
+    ]
+    done, _ = loop.run_until_complete(asyncio.wait(tasks))
+    for fut in done:
+        print("return value is {}".format(fut.result()))
+    loop.close()
+    end = time.time()
+    print("Total time: {}".format(end - start))
+def asy():
+    import asyncio
+
+    @asyncio.coroutine
+    def func_normal():
+        print('A')
+        yield from asyncio.sleep(5)
+        print('B')
+        return 'saad'
+
+    @asyncio.coroutine
+    def func_infinite():
+        for i in range(10):
+            print("--%d" % i)
+        return 'saad2'
+
+    loop = asyncio.get_event_loop()
+    tasks = func_normal(), func_infinite()
+    a, b = loop.run_until_complete(asyncio.gather(*tasks))
+    print("func_normal()={a}, func_infinite()={b}".format(**vars()))
+    loop.close()
 
 if __name__ == "__main__":
     # multiproc()
+    '''
     input_args = 'hiii'
     res = mproc_res(mproc_func, input_args)
     print("[info] out of mproc")
     print("[info] res")
+    '''
+    asy2()
+
+
