@@ -216,10 +216,6 @@ def set_my_server():  # shared_list):
 
 
 def do_Send():
-    print(my_tcp_conns)
-    return
-
-
     if not username:
         CmdWin.insert(1.0, "\n[Error] You must have a username first.")
         return
@@ -246,11 +242,11 @@ def do_Poke():
         CmdWin.insert(1.0, "\n[Error] You must have a username first.")
         return
 
-    if not roomname:
+    if not check_join():
         CmdWin.insert(1.0, "\n[Error] You must join a chatroom first.")
         return
 
-    targetname = userentry.get()
+    targetname = parse_name(userentry)
 
     # if empty, provide list; if not empty check if it's inside the list
     msg = 'J:{roomname}:{username}:{userIP}:{port}::\r\n'.format(roomname=roomname, username=username,
@@ -278,9 +274,15 @@ def do_Poke():
         idx = membermsg.index(targetname)
         print("index of ", targetname, " is ", str.encode(msg),
               (membermsg[idx + 1], int(membermsg[idx + 2])), flush=False)
+
         s.sendto(str.encode(msg), (membermsg[idx + 1], int(membermsg[idx + 2])))
         s.settimeout(2);
-        rmsg = s.recvfrom(1000)  # .decode("utf-8")
+
+        try:
+            rmsg = s.recvfrom(1000)  # .decode("utf-8")
+        except socket.timeout:
+            CmdWin.insert(1.0, "\n[Error] Your [Poke] was not sent successfully")
+            return
         if not rmsg:
             print("failure", flush=False)
             CmdWin.insert(1.0, "\n[Error] Poke failure")
