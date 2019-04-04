@@ -39,7 +39,6 @@ def handle_join_rmsg(rmsg, roomname, CmdWin, MsgWin):
         CmdWin.insert(1.0, outstr)
     MsgWin.insert(1.0, "\n[Join] received msg: {}".format(rmsg))
 
-
 def parse_members(msg_str, prefix="M:", suffix="::\r\n"):
     msg = parse_rmsg(msg_str, prefix=prefix, suffix=suffix)
     # M:15384212722403738702:u1:localhost:32340:u2:localhost:32340:u3:localhost:32340::
@@ -58,6 +57,8 @@ def parse_members(msg_str, prefix="M:", suffix="::\r\n"):
     gList = sorted(mems, key=lambda x: x.HashID, reverse=True)
 
     return gList
+
+
 
 
 class Member(object):
@@ -84,5 +85,3 @@ def keepalive(msg, sockfd, txt='', interval=20):
         time.sleep(interval)
         # show_time(txt)
         rmsg = query(msg, sockfd)
-
-
