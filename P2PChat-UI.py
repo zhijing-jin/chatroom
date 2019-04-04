@@ -100,6 +100,8 @@ def do_Join(zihao=False):
 
     if not name:
         CmdWin.insert(1.0, "\n[Error] roomname cannot be empty.")
+    elif roomname:
+        CmdWin.insert(1.0, "\n[Error] Already in a room. Cannot change rooms.")
     else:
         roomname = name
         # Step 1. join the chatroom, by sending msg to chatroom app
@@ -155,8 +157,8 @@ def do_Join(zihao=False):
         p.start()
         multiproc += [p]
 
-        import pdb;
-        pdb.set_trace()
+        # import pdb;
+        # pdb.set_trace()
 
 
 def set_my_server():  # shared_list):
