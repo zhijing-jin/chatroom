@@ -37,7 +37,6 @@ myip = '127.0.0.1'
 myport = int(sys.argv[3])
 mysock = None
 username = ""
-username_change = True #FIXME: this is equivalent to do a roomname check?
 roomname = ""
 
 msgID = 0
@@ -54,9 +53,33 @@ multiproc = [] # a global list to manage the multi processing
 # Functions to handle user input
 #
 
+# this function checks whether the client has joined in  or not
+# considering possible unstability of network, a local variable may not be sufficient to check join
+# therefore each time need to check join, we send a query, and set roomname to False if failed
+# in this way, if the client accidentally gets kicked from a chatroom, he still can join a chatroom
+def check_join():
+    global roomname
+
+    if not roomname:
+        return False
+    if not username:
+        return False
+    msg_check_mem = 'J:{roomname}:{username}:{userIP}:{port}::\r\n'. \
+        format(roomname=roomname, username=username,
+               userIP=myip, port=myport)
+    try:
+        rmsg = query(msg_check_mem, roomchat_sock)
+    except:
+        return False
+    if rmsg[0] == 'F':  # if 'F',
+        roomname = None
+        return False
+    else:
+        return True
+
 def do_User():
-    global username, username_change
-    if not username_change:
+    global username
+    if check_join():
         CmdWin.insert(1.0,
                       "\n[Warn] You cannot change username because you have [Join]'ed. Your current name: {}".format(
                           username))
@@ -89,7 +112,7 @@ def do_List():
 
 
 def do_Join(zihao=False):
-    global roomname, roomchat_ip, username_change, \
+    global roomname, roomchat_ip, \
         multiproc, msgID, sock_peers, \
         my_tcp_conns
     name = parse_name(userentry)
@@ -100,8 +123,11 @@ def do_Join(zihao=False):
 
     if not name:
         CmdWin.insert(1.0, "\n[Error] roomname cannot be empty.")
-    elif roomname:
-        CmdWin.insert(1.0, "\n[Error] Already in a room. Cannot change rooms.")
+    elif check_join():
+        if name == roomname:
+            CmdWin.insert(1.0, "\n[Warn] You are already in room {}.".format(roomname))
+        else:
+            CmdWin.insert(1.0, "\n[Error] Already in a room. Cannot change rooms.")
     else:
         roomname = name
         # Step 1. join the chatroom, by sending msg to chatroom app
@@ -110,9 +136,6 @@ def do_Join(zihao=False):
                    userIP=myip, port=myport)
         rmsg = query(msg_check_mem, roomchat_sock)
         handle_join_rmsg(rmsg, roomname, CmdWin, MsgWin)
-
-        # after joining, users cannot change names
-        username_change = False
 
         # Step 2. keepalive, by sending JOIN msg to the chatroom app every 20 sec
         p = Process(target=keepalive, args=(msg_check_mem, roomchat_sock, username,))
