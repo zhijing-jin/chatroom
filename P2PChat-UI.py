@@ -53,18 +53,9 @@ multiproc = [] # a global list to manage the multi processing
 multithread = [] # a global list to manage the multithread work
 thread_end = False
 
-def keepalive(msg, sockfd, txt='', interval=20):
-    while True:
-        # second = datetime.datetime.now().strftime('%m%d%H%M-%S')[-2:]
-        # if int(second) % 20 == 0:
-        time.sleep(interval)
-        # show_time(txt)
-        rmsg = query(msg, sockfd)
-
 class keepalive_thread(threading.Thread):
     def __init__(self, msg, sockfd, txt='', interval=2, name='keep alive thread'):
         threading.Thread.__init__(self)
-        # self._stopevent = threading.Event(  )
         self.name = name
         self.interval = interval
         self.msg = msg
@@ -80,33 +71,29 @@ class keepalive_thread(threading.Thread):
 
             rmsg = query(self.msg, self.sockfd)
 
-
-def keepalive(msg, sockfd, txt='', interval=20):
-    while True:
-        # second = datetime.datetime.now().strftime('%m%d%H%M-%S')[-2:]
-        # if int(second) % 20 == 0:
-        time.sleep(interval)
-        # show_time(txt)
-        rmsg = query(msg, sockfd)
-
 class server_thread(threading.Thread):
-    def __init__(self, msg, sockfd, txt='', interval=2, name='keep alive thread'):
+    def __init__(self, msg, name='server thread'):
         threading.Thread.__init__(self)
-        self._stopevent = threading.Event(  )
-        self.name = name
-        self.interval = interval
         self.msg = msg
-        self.sockfd = sockfd
-        self.txt = txt
+        self.name = name
+
 
     def run(self):
         # try:
-        while not self._stopevent.is_set():
+        build_tcp_server(self.msg)
 
-            time.sleep(self.interval)
-            print('greetings from', self.txt, ' with thread ', self.name)
+class forwardlink_thread(threading.Thread):
+    def __init__(self, msg, myHashID, msgID, name='forwardlink thread'):
+        threading.Thread.__init__(self)
+        self.msg = msg
+        self.name = name
+        self.myHashID = myHashID
+        self.msgID = msgID
 
-            rmsg = query(self.msg, self.sockfd)
+
+    def run(self):
+        # try:
+        retain_forward_link(self.msg, self.myHashID, self.msgID)
 #
 # Functions to handle user input
 #
@@ -216,9 +203,14 @@ def do_Join():
 
         # Step 4. start my TCP server, as the server for other users to CONNECT to in the chatroom
         # TODO: chagne to thread
-        p = build_server_thread(msg_check_mem)
-        p.start()
-        multiproc += [p]
+		# p = Process(target=build_tcp_server,
+		# 		args=(msg_check_mem,))
+		# p.start()
+		# multiproc += [p]
+        t = server_thread(msg_check_mem)
+        t.start()
+        multithread += [t]
+        print('[Info] out of server thread')
 
         # Step 5. start a TCP client, to CONNECT another user's TCP server in the chatroom
         print('[Info] Entering forward link establishment')
@@ -231,10 +223,13 @@ def do_Join():
         # (when the user that you CONNECT to terminates, you need to connect to another TCP server instead)
         # TODO: for the following process, I need to reuse `msgID` and `my_tcp_conns`
         # TODO: change to thread
-        p = Process(target=retain_forward_link,
-                    args=(msg_check_mem, myHashID, msgID))
-        p.start()
-        multiproc += [p]
+        # p = Process(target=retain_forward_link,
+        #             args=(msg_check_mem, myHashID, msgID))
+        # p.start()
+        # multiproc += [p]
+        t = forwardlink_thread(msg_check_mem, myHashID, msgID)
+        t.start()
+        multithread += [t]
 
         # import pdb;
         # pdb.set_trace()
@@ -539,8 +534,8 @@ def build_tcp_server(msg_check_mem):
 
 
     # TODO: is this the right termination?
-    sockfd.close()
-    conn.close()
+    # sockfd.close()
+    # conn.close()
 
 def retain_forward_link(msg_check_mem, myHashID, msgID):
     global my_tcp_conns, roomname, username, myip, myport, MsgWin, roomchat_sock, sock_peers, forwardlink
@@ -548,7 +543,7 @@ def retain_forward_link(msg_check_mem, myHashID, msgID):
     rmsg_mem = query(msg_check_mem, roomchat_sock)
     roomhash = rmsg_mem[0]
 
-    while True:
+    while not thread_end:
         rmsg_mem = query(msg_check_mem, roomchat_sock)
 
         # if the roomhash is changed, update the member list
