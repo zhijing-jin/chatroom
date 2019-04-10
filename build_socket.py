@@ -25,66 +25,66 @@ def build_tcp_client(server_ip, server_port):
 
 
 
-def forward_link(gList, myHashID, sock_peers,
-				 roomname, username, myip, myport, msgID, MsgWin,
-				 my_tcp_conns):
-	'''
-	This function establishes a forward link to a peer in the chatroom
-	:param gList: the list of members
-	:param myHashID: the hash of `myname+myip+myport`
-	:param sock_peers: a dict storing my backward and forward links
-	:param roomname: the name of the chatroom
-	:param username: my username
-	:param myip: my ip address
-	:param myport: my port
-	:param msgID: the ID of my message, counting from zero
-	:param MsgWin:
-	:param my_tcp_conns: the list of connections, which needs to be closed in do_Quit()
-	:return: sock_peers, msgID, my_tcp_conns
-	'''
-	my_gList_ix = [my_gList_ix for my_gList_ix, item in enumerate(gList)
-				   if item.HashID == myHashID][0]
-	start = (my_gList_ix + 1) % len(gList)
-
-	forwardlink = None
-
-	# this while loop finds ONE peer to establish a forward link to
-	while gList[start].HashID != myHashID:
-		print("[loop gList] start:", start)
-
-		if gList[start].HashID in sock_peers['backward']:
-			start = (start + 1) % len(gList)
-		else:
-			my_tcp_client = build_tcp_client(gList[start].ip, gList[start].port)
-			# my_tcp_client = build_tcp_client('localhost', 32345)
-			# if myport == 32342:
-			#     import pdb;
-			#     pdb.set_trace()
-
-			if my_tcp_client != False:
-				# handshake
-				msg = 'P:{roomname}:{username}:{userIP}:{port}:{msgID}::\r\n'. \
-					format(roomname=roomname, username=username,
-						   userIP=myip, port=myport, msgID=msgID)
-				MsgWin.insert(1.0, "\n[JOIN] peer-to-peer handshake sent msg: {}".format(msg))
-				rmsg = query(msg, my_tcp_client)
-				if rmsg.startswith('S:'):
-					sock_peers['forward'] = gList[start].HashID
-					gList[start].backward += [myHashID]
-					gList[my_gList_ix].forward = gList[start].HashID
-
-					msgID += 1
-					my_tcp_conns += [my_tcp_client]
-					forwardlink = my_tcp_client
-					print("[Info] sock_peers['forward']:", gList[start].name)
-					break
-				elif rmsg.startswith('F:not_member_msg::\r\n'):
-					my_tcp_client.close()
-				else:
-					start = (start + 1) % len(gList)
-			else:
-				start = (start + 1) % len(gList)
-	return sock_peers, msgID, my_tcp_conns, forwardlink
+# def forward_link(gList, myHashID, sock_peers,
+# 				 roomname, username, myip, myport, msgID, MsgWin,
+# 				 my_tcp_conns):
+# 	'''
+# 	This function establishes a forward link to a peer in the chatroom
+# 	:param gList: the list of members
+# 	:param myHashID: the hash of `myname+myip+myport`
+# 	:param sock_peers: a dict storing my backward and forward links
+# 	:param roomname: the name of the chatroom
+# 	:param username: my username
+# 	:param myip: my ip address
+# 	:param myport: my port
+# 	:param msgID: the ID of my message, counting from zero
+# 	:param MsgWin:
+# 	:param my_tcp_conns: the list of connections, which needs to be closed in do_Quit()
+# 	:return: sock_peers, msgID, my_tcp_conns
+# 	'''
+# 	my_gList_ix = [my_gList_ix for my_gList_ix, item in enumerate(gList)
+# 				   if item.HashID == myHashID][0]
+# 	start = (my_gList_ix + 1) % len(gList)
+#
+# 	forwardlink = None
+#
+# 	# this while loop finds ONE peer to establish a forward link to
+# 	while gList[start].HashID != myHashID:
+# 		print("[loop gList] start:", start)
+#
+# 		if gList[start].HashID in sock_peers['backward']:
+# 			start = (start + 1) % len(gList)
+# 		else:
+# 			my_tcp_client = build_tcp_client(gList[start].ip, gList[start].port)
+# 			# my_tcp_client = build_tcp_client('localhost', 32345)
+# 			# if myport == 32342:
+# 			#     import pdb;
+# 			#     pdb.set_trace()
+#
+# 			if my_tcp_client != False:
+# 				# handshake
+# 				msg = 'P:{roomname}:{username}:{userIP}:{port}:{msgID}::\r\n'. \
+# 					format(roomname=roomname, username=username,
+# 						   userIP=myip, port=myport, msgID=msgID)
+# 				MsgWin.insert(1.0, "\n[JOIN] peer-to-peer handshake sent msg: {}".format(msg))
+# 				rmsg = query(msg, my_tcp_client)
+# 				if rmsg.startswith('S:'):
+# 					sock_peers['forward'] = gList[start].HashID
+# 					gList[start].backward += [myHashID]
+# 					gList[my_gList_ix].forward = gList[start].HashID
+#
+# 					msgID += 1
+# 					my_tcp_conns += [my_tcp_client]
+# 					forwardlink = my_tcp_client
+# 					print("[Info] sock_peers['forward']:", gList[start].name)
+# 					break
+# 				elif rmsg.startswith('F:not_member_msg::\r\n'):
+# 					my_tcp_client.close()
+# 				else:
+# 					start = (start + 1) % len(gList)
+# 			else:
+# 				start = (start + 1) % len(gList)
+# 	return sock_peers, msgID, my_tcp_conns, forwardlink
 
 # def build_tcp_server(server_ip, server_port, msg_check_mem, sock_chatroom):
 #     # Step 1. create socket and bind
