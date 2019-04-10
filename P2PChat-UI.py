@@ -47,6 +47,7 @@ msgID = 0
 HID_msgID_dict = {}
 sock_peers = {'backward': [], 'forward': None} # backward holds a list of hasIDs [hashID], forward holds hashID where this p2p is pointing at
 my_tcp_server = None
+my_tcp_client = None
 my_tcp_conns = []
 my_udp_socket = None
 backwardlink = [] #backward links
@@ -115,17 +116,78 @@ class server_thread(working_threads):
 			print("{} internally ended".format(self.name))
 
 class client_thread(working_threads):
-	def __init__(self, name):
+	def __init__(self, name='client thread'):
 		working_threads.__init__(self)
 		self.name = name
 
 
 	def run(self):
+		global my_tcp_client
+
 		try:
-			pass
+			RList = [my_tcp_client]
+
+			# create an empty WRITE socket list
+			WList = []
+
+			while not thread_end:
+				print('Client is ready for receiving messages')
+				# use select to wait for any incoming connection requests or
+				# incoming messages or 10 seconds
+				try:
+					Rready, Wready, Eready = select.select(RList, [], [], 10)
+				except select.error as emsg:
+					print("At select, caught an exception:", emsg)
+					sys.exit(1)
+				except KeyboardInterrupt:
+					print("At select, caught the KeyboardInterrupt")
+					sys.exit(1)
+
+				# if has incoming activities
+				if Rready:
+					my_tcp_client.settimeout(0.1);
+					print('Client is ready in tcp chatting', my_tcp_client)
+
+					try:
+						rmsg = my_tcp_client.recv(1000)  # .decode("utf-8")
+					except socket.timeout:
+						print("Your forward link was not sent successfully")
+						pass
+					if rmsg:
+						receive_and_send(rmsg)
+					else:
+						print("A client connection is broken!!")
 		finally:
 			print("{} internally ended".format(self.name))
 
+def receive_and_send(rmsg):
+	print('this is rmsg', rmsg)
+	msg_split, content = parse_send_message(rmsg.decode("utf-8"))
+	print(msg_split, content)
+	if msg_split: # otherwise the msg format is incorrect
+		origin_roomname = msg_split[0]
+		originHID = msg_split[1]
+		origin_username = msg_split[2]
+		msgID = msg_split[3]
+		print(origin_roomname, originHID, origin_username, msgID, content)
+
+		if origin_roomname != roomname:
+			print('this is not my room')
+		elif originHID in HID_msgID_dict:
+			if HID_msgID_dict[originHID] == msgID:
+				print('we have recorded this message')
+			else:
+				HID_msgID_dict[originHID] = msgID
+				HID_msgID_dict[originHID] = msgID
+				MsgWin.insert(1.0, "\n[{origin_username}]: {content}".format(origin_username=origin_username, content=content))
+				print('{origin_username} : {content}'.format(origin_username=origin_username, content=content))
+		else:
+			#FIXME if I don't know this person, then something should happen
+			HID_msgID_dict[originHID] = msgID
+			MsgWin.insert(1.0, "\n[{origin_username}]: {content}".format(origin_username=origin_username, content=content))
+			print('{origin_username} : {content}'.format(origin_username=origin_username, content=content))
+	else:
+		print('incorrect msg format')
 
 class forwardlink_thread(working_threads):
 	def __init__(self, msg, myHashID, msgID, name='forwardlink thread'):
@@ -283,10 +345,6 @@ def do_Join():
 		# import pdb;
 		# pdb.set_trace()
 
-def tmp_test(one):
-	while True:
-		time.sleep(2.0)
-		print(one)
 
 
 def do_Send():
@@ -313,40 +371,13 @@ def do_Send():
 
 	msgID += 1
 	msg = 'T:{roomname}:{originHID}:{username}:{msgID}:{msgLength}:{content}::\r\n'.format(roomname=roomname, originHID=originHID, username=username, msgID=msgID, msgLength=len(sendmsg), content=sendmsg)
-	MsgWin.insert(1.0, "\n[{username}] : {content}".format(username=username, content=sendmsg))
+	MsgWin.insert(1.0, "\n[{username}]: {content}".format(username=username, content=sendmsg))
 	MsgWin.insert(1.0, '\nYou want to send message{}'.format(msg))
 	if forwardlink:
 		forwardlink.send(str.encode(msg))
 	for bwl in backwardlink:
 		print('I send via', bwl)
 		bwl.send(str.encode(msg))
-	# MsgWin.insert(1.0, "\n The message you are sending is " + msg)
-	# idx = membermsg.index(targetname)
-	# print("index of ", targetname, " is ", str.encode(msg),
-	#       (membermsg[idx + 1], int(membermsg[idx + 2])), flush=False)
-	#
-	# s.sendto(str.encode(msg), (membermsg[idx + 1], int(membermsg[idx + 2])))
-	# s.settimeout(2);
-	#
-	# try:
-	#     rmsg = s.recvfrom(1000)  # .decode("utf-8")
-	# except socket.timeout:
-	#     CmdWin.insert(1.0, "\n[Error] Your [Poke] was not sent successfully")
-	#     return
-	# if not rmsg:
-	#     print("failure", flush=False)
-	#     CmdWin.insert(1.0, "\n[Error] Poke failure")
-	# elif "A::\r\n" == rmsg[0].decode("utf-8"):
-	#     print("success", flush=False)
-	#     CmdWin.insert(1.0, "\n[Poke] You poked {}".format(targetname))
-	# else:
-	#     CmdWin.insert(1.0, "\n[Error] Poke failure")
-
-
-
-
-
-
 
 def do_Poke():
 	global my_udp_socket
@@ -469,8 +500,6 @@ def build_tcp_server(msg_check_mem):
 
 	# add the listening socket to the READ socket list
 	RList = [sockfd, udp]
-	backwardlink += [sockfd, udp]
-
 	# create an empty WRITE socket list
 	WList = []
 
@@ -565,31 +594,7 @@ def build_tcp_server(msg_check_mem):
 					print('I am in tcp chatting', sd)
 					rmsg = sd.recv(1000)
 					if rmsg:
-						print("Got a message!!", rmsg)
-						msg_split, content = parse_send_message(rmsg.decode("utf-8"))
-						print(msg_split, content)
-						if msg_split: # otherwise the msg format is incorrect
-							origin_roomname = msg_split[0]
-							originHID = msg_split[1]
-							origin_username = msg_split[2]
-							msgID = msg_split[3]
-							print(origin_roomname, originHID, origin_username, msgID, content)
-
-							if origin_roomname != roomname:
-								print('this is not my room')
-							elif originHID in HID_msgID_dict:
-								if HID_msgID_dict[originHID] == msgID:
-									print('we have recorded this message')
-								else:
-									HID_msgID_dict[originHID] = msgID
-									print('this is a new message', content)
-							else:
-								#FIXME if I don't know this person, then something should happen
-								HID_msgID_dict[originHID] = msgID
-								MsgWin.insert(1.0, "\n[{origin_username}]: {content}".format(origin_username=origin_username, content=content))
-								print('{origin_username} : {content}'.format(origin_username=origin_username, content=content))
-						else:
-							print('incorrect msg format')
+						receive_and_send(rmsg)
 					else:
 						print("A client connection is broken!!")
 	# TODO: is this the right termination?
@@ -640,7 +645,7 @@ def forward_link(gList, myHashID, sock_peers_TODO,
 	:param my_tcp_conns: the list of connections, which needs to be closed in do_Quit()
 	:return: sock_peers, msgID, my_tcp_conns
 	'''
-	global my_tcp_conns, forwardlink, sock_peers
+	global my_tcp_conns, forwardlink, sock_peers, my_tcp_client, multithread
 	my_gList_ix = [my_gList_ix for my_gList_ix, item in enumerate(gList)
 				   if item.HashID == myHashID][0]
 	start = (my_gList_ix + 1) % len(gList)
@@ -661,6 +666,10 @@ def forward_link(gList, myHashID, sock_peers_TODO,
 			#     pdb.set_trace()
 
 			if my_tcp_client != False:
+				t = client_thread()
+				t.start()
+				multithread += [t]
+				print("[Info] out of client thread")
 				# handshake
 				msg = 'P:{roomname}:{username}:{userIP}:{port}:{msgID}::\r\n'. \
 					format(roomname=roomname, username=username,
