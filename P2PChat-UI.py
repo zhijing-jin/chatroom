@@ -17,6 +17,7 @@ from multiprocessing import Process
 import select
 import threading
 import time
+import ctypes
 
 sys.path.append('.')
 
@@ -54,7 +55,7 @@ multithread = [] # a global list to manage the multithread work
 thread_end = False
 
 class keepalive_thread(threading.Thread):
-    def __init__(self, msg, sockfd, txt='', interval=2, name='keep alive thread'):
+    def __init__(self, msg, sockfd, txt='', interval=20, name='keep alive thread'):
         threading.Thread.__init__(self)
         self.name = name
         self.interval = interval
@@ -63,13 +64,31 @@ class keepalive_thread(threading.Thread):
         self.txt = txt
 
     def run(self):
-        # try:
-        while not thread_end:
+        try:
+            while not thread_end:
 
-            time.sleep(self.interval)
-            print('greetings from', self.txt, ' with thread ', self.name)
+                time.sleep(self.interval)
+                print('greetings from', self.txt, ' with thread ', self.name)
 
-            rmsg = query(self.msg, self.sockfd)
+                rmsg = query(self.msg, self.sockfd)
+        finally:
+            print("{} internally ended".format(self.name))
+    def get_id(self):
+
+        # returns id of the respective thread
+        if hasattr(self, '_thread_id'):
+            return self._thread_id
+        for id, thread in threading._active.items():
+            if thread is self:
+                return id
+
+    def raise_exception(self):
+        thread_id = self.get_id()
+        res = ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_id,
+              ctypes.py_object(SystemExit))
+        if res > 1:
+            ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_id, 0)
+            print('Exception raise failure')
 
 class server_thread(threading.Thread):
     def __init__(self, msg, name='server thread'):
@@ -79,8 +98,27 @@ class server_thread(threading.Thread):
 
 
     def run(self):
-        # try:
-        build_tcp_server(self.msg)
+        try:
+            build_tcp_server(self.msg)
+        finally:
+            print("{} internally ended".format(self.name))
+
+    def get_id(self):
+
+        # returns id of the respective thread
+        if hasattr(self, '_thread_id'):
+            return self._thread_id
+        for id, thread in threading._active.items():
+            if thread is self:
+                return id
+
+    def raise_exception(self):
+        thread_id = self.get_id()
+        res = ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_id,
+              ctypes.py_object(SystemExit))
+        if res > 1:
+            ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_id, 0)
+            print('Exception raise failure')
 
 class forwardlink_thread(threading.Thread):
     def __init__(self, msg, myHashID, msgID, name='forwardlink thread'):
@@ -92,8 +130,27 @@ class forwardlink_thread(threading.Thread):
 
 
     def run(self):
-        # try:
-        retain_forward_link(self.msg, self.myHashID, self.msgID)
+        try:
+            retain_forward_link(self.msg, self.myHashID, self.msgID)
+        finally:
+            print("{} internally ended".format(self.name))
+
+    def get_id(self):
+
+        # returns id of the respective thread
+        if hasattr(self, '_thread_id'):
+            return self._thread_id
+        for id, thread in threading._active.items():
+            if thread is self:
+                return id
+
+    def raise_exception(self):
+        thread_id = self.get_id()
+        res = ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_id,
+              ctypes.py_object(SystemExit))
+        if res > 1:
+            ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_id, 0)
+            print('Exception raise failure')
 #
 # Functions to handle user input
 #
@@ -378,14 +435,16 @@ def do_Quit():
             conn.close()
         print("[Info] Closed tcp_conn, tcp_server")
 
-    for p in multiproc:
-        p.terminate()
-        p.join()
-    print("[Info] Closed multiprocessing")
+    # for p in multiproc:
+    #     p.terminate()
+    #     p.join()
+    # print("[Info] Closed multiprocessing")
 
-    thread_end = True
-    # for t in multithread:
-    #     t._stopevent.set()
+    sys.exit(0)
+
+    # thread_end = True
+    for t in multithread:
+        t.raise_exception()
 
     for t in multithread:
         t.join()
