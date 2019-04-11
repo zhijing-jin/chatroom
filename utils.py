@@ -83,11 +83,38 @@ def mproc_func(text):
         show_time(text)
     return i
 
+
 async def async_func(text):
     for i in range(5):
-        await asyncio.sleep(1)
+        # await asyncio.sleep(1)
         show_time(text)
     return text
+
+
+@asyncio.coroutine
+def async_cor_func(text):
+    for i in range(5):
+        yield from asyncio.sleep(1)
+        show_time(text)
+    return text
+
+
+def asy3():
+    import asyncio
+    import time
+
+    start = time.time()
+    loop = asyncio.get_event_loop()
+    asyncio.ensure_future(async_func("A"), loop=loop)
+    asyncio.ensure_future(async_func("B"), loop=loop)
+
+    done, _ = loop.run_until_complete(asyncio.wait(tasks))
+    for fut in done:
+        print("return value is {}".format(fut.result()))
+    loop.close()
+    end = time.time()
+    print("Total time: {}".format(end - start))
+
 
 def asy2():
     import asyncio
@@ -105,6 +132,8 @@ def asy2():
     loop.close()
     end = time.time()
     print("Total time: {}".format(end - start))
+
+
 def asy():
     import asyncio
 
@@ -127,6 +156,7 @@ def asy():
     print("func_normal()={a}, func_infinite()={b}".format(**vars()))
     loop.close()
 
+
 if __name__ == "__main__":
     # multiproc()
     '''
@@ -136,5 +166,3 @@ if __name__ == "__main__":
     print("[info] res")
     '''
     asy2()
-
-

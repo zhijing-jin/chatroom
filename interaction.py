@@ -2,6 +2,7 @@ import time
 from utils import sdbm_hash, show_time
 from collections import OrderedDict
 from tkinter import END
+import asyncio
 
 
 def query(msg_str, sockfd, recv_size=1000):
@@ -78,10 +79,12 @@ def parse_memberships(msg_str, prefix="M:", suffix="::\r\n"):
     return msg_str.split(':')
 
 
-def keepalive(msg, sockfd, txt='', interval=20):
+async def keepalive(msg, sockfd, txt='', interval=20):
     while True:
         # second = datetime.datetime.now().strftime('%m%d%H%M-%S')[-2:]
         # if int(second) % 20 == 0:
-        time.sleep(interval)
-        # show_time(txt)
+        # if async:
+        await asyncio.sleep(interval)
+        # time.sleep(interval)
+        show_time(txt)
         rmsg = query(msg, sockfd)
