@@ -208,6 +208,9 @@ class forwardlink_thread(working_threads):
 	def run(self):
 		try:
 			retain_forward_link(self.msg, self.myHashID, self.msgID)
+			# while not thread_end:
+			# 	time.sleep(5)
+			# 	print('link waken')
 		finally:
 			print("{} internally ended".format(self.name))
 
@@ -363,7 +366,7 @@ def do_Send():
 		CmdWin.insert(1.0, "\n[Error] You must have a username first.")
 		return
 
-	if not check_join:
+	if not check_join():
 		CmdWin.insert(1.0, "\n[Error] You must join a chatroom first.")
 		return
 
@@ -476,13 +479,14 @@ def do_Quit():
 	#     p.join()
 	# print("[Info] Closed multiprocessing")
 
-	sys.exit(0)
+	# sys.exit(0)
 
-	# thread_end = True
+	thread_end = True
+	# for t in multithread:
+	# 	t.raise_exception()
+
 	for t in multithread:
 		t.raise_exception()
-
-	for t in multithread:
 		t.join()
 		print("[Info] {name} has joined".format(name=t.name))
 	print("[Info] Closed multithreading")
