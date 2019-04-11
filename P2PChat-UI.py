@@ -44,6 +44,8 @@ username = ""
 roomname = ""
 
 msgID = 0
+# this will include myself, so that when my message is sent back to me, I know not to resend it
+# HID as str, msgID as int
 HID_msgID_dict = {}
 sock_peers = {'backward': [], 'forward': None} # backward holds a list of hasIDs [hashID], forward holds hashID where this p2p is pointing at
 my_tcp_server = None
@@ -160,10 +162,14 @@ class client_thread(working_threads):
 		finally:
 			print("{} internally ended".format(self.name))
 
+def err(msg = 'We encounter an error'):
+	print('[Error] {}'.format(msg))
+
 '''
 sending_sock is where the message comes from, and therefore not necessary to resend message to him
 '''
 def receive_and_send(rmsg, sending_sock):
+	global HID_msgID_dict, roomchat_sock
 	print('this is rmsg', rmsg)
 	msg_split, content = parse_send_message(rmsg.decode("utf-8"))
 	print(msg_split, content)
@@ -176,14 +182,37 @@ def receive_and_send(rmsg, sending_sock):
 
 		if origin_roomname != roomname:
 			print('this is not my room')
-		elif originHID in HID_msgID_dict and HID_msgID_dict[originHID] == msgID:
-			#TODO: not necessary equal, if it's integer, then smaller than current is also possible
-			print('we have recorded this message')
+			return
+		if originHID in HID_msgID_dict and int(HID_msgID_dict[originHID]) >= int(msgID):
+			err('we have recorded this message')
 			return
 
-		HID_msgID_dict[originHID] = msgID
-		MsgWin.insert(1.0, "\n[{origin_username}]: {content}".format(origin_username=origin_username, content=content))
-		print('{origin_username} : {content}'.format(origin_username=origin_username, content=content))
+		if not originHID in HID_msgID_dict:
+			# handle the case that this is an unknown peer
+			print("[Info] I don't know this guy, add it to my dict")
+			msg_check_mem = 'J:{roomname}:{username}:{userIP}:{port}::\r\n'. \
+				format(roomname=roomname, username=username,
+					   userIP=myip, port=myport)
+			try:
+				newmsg = query(msg_check_mem, roomchat_sock)
+				membermsg = parse_memberships(newmsg)
+				memberships = membermsg[1::3]
+			except:
+				err('Fail to ask roomserver about the unknown sender')
+			if not newmsg or newmsg[0] == 'F':
+				err('Fail to ask roomserver about the unknown sender')
+				return
+
+			try:
+				# if cannot find him in the group list, report an error
+				idx = memberships.index(origin_username)
+			except:
+				err('Fail to find sender: {} in this chatroom'.format(origin_username))
+				return
+			print("[Info] upon asking for this unknown, I get", newmsg)
+
+		HID_msgID_dict[originHID] = int(msgID)
+		MsgWin.insert(1.0, "\n[{origin_username}] [ID: {msgID}]: {content}".format(origin_username=origin_username, msgID=msgID, content=content))
 
 		my_connections = backwardlink
 		if forwardlink:
@@ -191,7 +220,6 @@ def receive_and_send(rmsg, sending_sock):
 		for sk in my_connections:
 			if sk != sending_sock:
 				sk.send(rmsg)
-		#FIXME if I don't know this person, then something should happen
 
 	else:
 		print('incorrect msg format')
@@ -238,7 +266,7 @@ def check_join():
 	except:
 		return False
 	if rmsg[0] == 'F':  # if 'F',
-		roomname = None
+		roomname = Nonem
 		return False
 	else:
 		return True
@@ -358,9 +386,8 @@ def do_Join():
 
 
 def do_Send():
-	global msgID
-	print('forwardlink', forwardlink)
-	print('backwardlink', backwardlink)
+	global msgID, HID_msgID_dict
+
 	# print()
 	if not username:
 		CmdWin.insert(1.0, "\n[Error] You must have a username first.")
@@ -375,14 +402,14 @@ def do_Send():
 		CmdWin.insert(1.0, "\n[Error] Empty message cannot be sent.")
 		return
 
-	CmdWin.insert(1.0, "\nPress Send")
-
 	originHID = sdbm_hash("{}{}{}".format(username, myip, myport))
 
 	msgID += 1
+	# also include myself in the dictionary
+	HID_msgID_dict[str(originHID)] = msgID
 	msg = 'T:{roomname}:{originHID}:{username}:{msgID}:{msgLength}:{content}::\r\n'.format(roomname=roomname, originHID=originHID, username=username, msgID=msgID, msgLength=len(sendmsg), content=sendmsg)
-	MsgWin.insert(1.0, "\n[{username}]: {content}".format(username=username, content=sendmsg))
-	# MsgWin.insert(1.0, '\nYou want to send message{}'.format(msg))
+	MsgWin.insert(1.0, "\n[{username}] [ID: {msgID}]: {content}".format(username=username, msgID=msgID, content=sendmsg))
+
 
 	if forwardlink:
 		forwardlink.send(str.encode(msg))
@@ -428,7 +455,9 @@ def do_Poke():
 		memberships = membermsg[1::3]
 
 		try:
-			idx = membermsg.index(targetname)
+			# if I use membermsg to find, and if someone use a port as username, it could cause misunderstanding
+			# therefore I use membership to search among usernames instead, and recover to membermsg
+			idx = memberships.index(targetname) * 3 + 1
 		except:
 			for member in memberships:
 				if member != username:
@@ -587,6 +616,7 @@ def build_tcp_server(msg_check_mem):
 						rmsg_mems = query(msg_check_mem, roomchat_sock)
 						gList = parse_members(rmsg_mems)
 						mem_hashes = set(mem.HashID for mem in gList)
+						HID_msgID_dict[str(client_hash)] = msgID
 
 						if not client_hash in mem_hashes:
 							print("[Error] Detected non-member connection. Closing.")
