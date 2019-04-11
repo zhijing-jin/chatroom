@@ -31,6 +31,19 @@ def parse_rmsg(msg_str, prefix="G:", suffix="::\r\n"):
     msg_str = msg_str[len(prefix): -len(suffix)]
     return msg_str.split(':')
 
+def parse_send_message(msg_str, prefix="T:", suffix="::\r\n"):
+    assert msg_str.startswith(prefix), "rmsg must start with {}, not {}".format(prefix, msg_str)
+    assert msg_str.endswith(suffix), "rmsg must end with {}".format(suffix)
+    msg_str = msg_str[len(prefix): -len(suffix)]
+    msg_split = msg_str.split(':')
+    if len(msg_split) < 5:
+        return None, None
+    try:
+        msglength = int(msg_split[4])
+    except:
+        return None, None
+    return msg_split[:4], msg_str[-msglength:]
+
 def handle_join_rmsg(rmsg, roomname, CmdWin, MsgWin):
     if rmsg[0] != 'F':
         outstr = "\n[Join] roomname: " + roomname
