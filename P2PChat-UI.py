@@ -51,11 +51,10 @@ HID_msgID_dict = {}
 sock_peers = {'backward': [],
               'forward': None}  # backward holds a list of hasIDs [hashID], forward holds hashID where this p2p is pointing at
 my_tcp_server = None
-my_tcp_client = None
 my_tcp_conns = []
 my_udp_socket = None
-backwardlink = []  # backward links
-forwardlink = []  # forward links
+backwardlink = {}  # backward links {"hash": conn}
+forwardlink = None  # forward links
 multiproc = []  # a global list to manage the multi processing
 multithread = []  # a global list to manage the multithread work
 thread_end = False
@@ -127,10 +126,10 @@ class client_thread(working_threads):
         self.name = name
 
     def run(self):
-        global my_tcp_client
+        global forwardlink
 
         try:
-            RList = [my_tcp_client]
+            RList = [forwardlink]
 
             # create an empty WRITE socket list
             WList = []
@@ -150,13 +149,13 @@ class client_thread(working_threads):
 
                 # if has incoming activities
                 if Rready:
-                    my_tcp_client.settimeout(0.1);
-                    print('Client is ready in tcp chatting', my_tcp_client)
+                    forwardlink.settimeout(0.1);
+                    print('Client is ready in tcp chatting', forwardlink)
 
                     try:
-                        rmsg = my_tcp_client.recv(1000)  # .decode("utf-8")
+                        rmsg = forwardlink.recv(1000)  # .decode("utf-8")
                         if rmsg:
-                            receive_and_send(rmsg, my_tcp_client)
+                            receive_and_send(rmsg, forwardlink)
                         else:
                             print("A client connection is broken!!")
                     except socket.timeout:
@@ -222,7 +221,7 @@ def receive_and_send(rmsg, sending_sock):
         MsgWin.insert(1.0, "\n[{origin_username}] [ID: {msgID}]: {content}".format(origin_username=origin_username,
                                                                                    msgID=msgID, content=content))
 
-        my_connections = backwardlink
+        my_connections = list(backwardlink.values())
         if forwardlink:
             my_connections += [forwardlink]
         for sk in my_connections:
@@ -429,7 +428,7 @@ def do_Send():
 
     if forwardlink:
         forwardlink.send(str.encode(msg))
-    for bwl in backwardlink:
+    for bwl in list(backwardlink.values()):
         print('I send via', bwl)
         bwl.send(str.encode(msg))
     userentry.delete(0, END)
@@ -604,10 +603,6 @@ def build_tcp_server(msg_check_mem):
                         print("[build_tcp_server] Socket accept error: ", emsg)
                         break
 
-                    # add the backward link to connections
-                    backwardlink += [conn]
-                    RList += [conn]
-
                     # print out peer socket address information
                     print("[build_tcp_server] Connection established. Remote client info:", addr)
 
@@ -644,6 +639,11 @@ def build_tcp_server(msg_check_mem):
                         msg = 'S:{msgID}::\r\n'.format(msgID=msgID)
                         conn.send(str.encode(msg))
                         print("[build_tcp_server] Connection established with {}:{}".format(*rmsg[2:4]))
+
+                        # Step 6. add the backward link to connections
+                        backwardlink[client_hash] = conn
+                        print("[P2P >build_tcp_server] backward link first established: {}".format(backwardlink))
+                        RList += [conn]
                     else:
                         break
                 else:  # it could be forward or a backward link, I don't care
@@ -693,6 +693,9 @@ def retain_forward_link(msg_check_mem, myHashID, msgID):
             # import pdb;
             # pdb.set_trace()
             mem_hashes = set(mem.HashID for mem in mems)
+            print("[P2P >retain] backwardlink RIGHT BEFORE update: {}".format(backwardlink))
+            backwardlink = {k: v for k, v in backwardlink.items() if k in mem_hashes}
+            print("[P2P >retain] backwardlink RIGHT AFTER update: {}".format(backwardlink))
 
             # if the my forward server is no longer in the member list,
             # make a new forward link
@@ -701,7 +704,8 @@ def retain_forward_link(msg_check_mem, myHashID, msgID):
                                                                             roomname, username, myip, myport, msgID,
                                                                             MsgWin,
                                                                             my_tcp_conns)
-				print('[Info] the forward link has been updated', forwardlink)															
+            print("[P2P >retain] forwardlink RIGHT AFTER update: {}".format(forwardlink))
+
         time.sleep(1)
 
 
@@ -722,7 +726,7 @@ def forward_link(gList, myHashID, sock_peers_TODO,
     :param my_tcp_conns: the list of connections, which needs to be closed in do_Quit()
     :return: sock_peers, msgID, my_tcp_conns
     '''
-    global my_tcp_conns, forwardlink, sock_peers, my_tcp_client, multithread
+    global my_tcp_conns, forwardlink, sock_peers, multithread
     my_gList_ix = [my_gList_ix for my_gList_ix, item in enumerate(gList)
                    if item.HashID == myHashID][0]
     start = (my_gList_ix + 1) % len(gList)
@@ -736,13 +740,13 @@ def forward_link(gList, myHashID, sock_peers_TODO,
         if gList[start].HashID in sock_peers['backward']:
             start = (start + 1) % len(gList)
         else:
-            my_tcp_client = build_tcp_client(gList[start].ip, gList[start].port)
-            # my_tcp_client = build_tcp_client('localhost', 32345)
+            forwardlink = build_tcp_client(gList[start].ip, gList[start].port)
+            # forwardlink = build_tcp_client('localhost', 32345)
             # if myport == 32342:
             #     import pdb;
             #     pdb.set_trace()
 
-            if my_tcp_client != False:
+            if forwardlink != False:
                 t = client_thread()
                 t.start()
                 multithread += [t]
@@ -752,20 +756,19 @@ def forward_link(gList, myHashID, sock_peers_TODO,
                     format(roomname=roomname, username=username,
                            userIP=myip, port=myport, msgID=msgID)
                 MsgWin.insert(1.0, "\n[JOIN] peer-to-peer handshake sent msg: {}".format(msg))
-                rmsg = query(msg, my_tcp_client)
+                rmsg = query(msg, forwardlink)
                 if rmsg.startswith('S:'):
                     sock_peers['forward'] = gList[start].HashID
                     gList[start].backward += [myHashID]
                     gList[my_gList_ix].forward = gList[start].HashID
 
                     msgID += 1
-                    my_tcp_conns += [my_tcp_client]
-                    forwardlink = my_tcp_client
-                    # backwardlink += [my_tcp_client]
+                    my_tcp_conns += [forwardlink]
+                    # backwardlink += [forwardlink]
                     print("[P2P >forward_link] sock_peers['forward']:", gList[start].name)
                     break
                 elif rmsg.startswith('F:not_member_msg::\r\n'):
-                    my_tcp_client.close()
+                    forwardlink.close()
                 else:
                     start = (start + 1) % len(gList)
             else:
