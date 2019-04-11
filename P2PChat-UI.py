@@ -138,26 +138,28 @@ class client_thread(working_threads):
 				# incoming messages or 10 seconds
 				try:
 					Rready, Wready, Eready = select.select(RList, [], [], 10)
-				except select.error as emsg:
+				except: # select.error as emsg:
 					print("At select, caught an exception:", emsg)
 					sys.exit(1)
-				except KeyboardInterrupt:
-					print("At select, caught the KeyboardInterrupt")
-					sys.exit(1)
+				# except KeyboardInterrupt:
+				# 	print("At select, caught the KeyboardInterrupt")
+				# 	sys.exit(1)
 
 				# if has incoming activities
 				if Rready:
-					my_tcp_client.settimeout(0.1);
-					print('Client is ready in tcp chatting', my_tcp_client)
+					print('How many are Rready: ', len(Rready), Rready)
+					for sk in Rready:
+						sk.settimeout(0.1);
+						print('Client is ready in tcp chatting', sk)
 
-					try:
-						rmsg = my_tcp_client.recv(1000)  # .decode("utf-8")
-						if rmsg:
-							receive_and_send(rmsg, my_tcp_client)
-						else:
-							print("A client connection is broken!!")
-					except socket.timeout:
-						print("Your forward link was not sent successfully")
+						try:
+							rmsg = sk.recv(1000)  # .decode("utf-8")
+							if rmsg:
+								receive_and_send(rmsg, sk)
+							else:
+								print("A client connection is broken!!")
+						except socket.timeout:
+							print("Your forward link was not sent successfully")
 
 		finally:
 			print("{} internally ended".format(self.name))
