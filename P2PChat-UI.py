@@ -129,13 +129,13 @@ class client_thread(working_threads):
         global forwardlink
 
         try:
-            RList = [forwardlink]
-
-            # create an empty WRITE socket list
-            WList = []
 
             while not thread_end:
-                print('Client is ready for receiving messages')
+                RList = [forwardlink]
+                # create an empty WRITE socket list
+                WList = []
+
+                # print('Client is ready for receiving messages')
                 # use select to wait for any incoming connection requests or
                 # incoming messages or 10 seconds
                 try:
@@ -149,17 +149,20 @@ class client_thread(working_threads):
 
                 # if has incoming activities
                 if Rready:
-                    forwardlink.settimeout(0.1);
-                    print('Client is ready in tcp chatting', forwardlink)
+                    for sd in Rready:
+                        if not sd:
+                            continue
+                        sd.settimeout(0.1);
+                        # print('Client is ready in tcp chatting', forwardlink)
 
-                    try:
-                        rmsg = forwardlink.recv(1000)  # .decode("utf-8")
-                        if rmsg:
-                            receive_and_send(rmsg, forwardlink)
-                        else:
-                            print("A client connection is broken!!")
-                    except socket.timeout:
-                        print("Your forward link was not sent successfully")
+                        try:
+                            rmsg = sd.recv(1000)  # .decode("utf-8")
+                            if rmsg:
+                                receive_and_send(rmsg, forwardlink)
+                            # else:
+                            #     print("A client connection is broken!!")
+                        except socket.timeout:
+                            print("Your forward link was not sent successfully")
 
         finally:
             print("{} internally ended".format(self.name))
@@ -558,11 +561,15 @@ def build_tcp_server(msg_check_mem):
     sockfd.listen(5)
 
     # add the listening socket to the READ socket list
-    RList = [sockfd, udp]
-    # create an empty WRITE socket list
-    WList = []
+
 
     while not thread_end:
+        RList = [sockfd, udp]
+        # create an empty WRITE socket list
+        WList = []
+        for bwl in list(backwardlink.values()):
+            RList += [bwl]
+
         # use select to wait for any incoming connection requests or
         # incoming messages or 10 seconds
         try:
@@ -576,7 +583,7 @@ def build_tcp_server(msg_check_mem):
 
         # if has incoming activities
         if Rready:
-            print('I am very busy')
+            # print('I am very busy', Rready, RList, backwardlink)
             # for each socket in the READ ready list
             for sd in Rready:
                 if sd == udp:
@@ -643,7 +650,7 @@ def build_tcp_server(msg_check_mem):
                         # Step 6. add the backward link to connections
                         backwardlink[client_hash] = conn
                         print("[P2P >build_tcp_server] backward link first established: {}".format(backwardlink))
-                        RList += [conn]
+                        # RList += [conn]
                     else:
                         break
                 else:  # it could be forward or a backward link, I don't care
@@ -651,12 +658,15 @@ def build_tcp_server(msg_check_mem):
                     # 	print('wow this is forward')
                     # else:
                     # 	print('this is backward :(')
-                    print('I am in tcp chatting', sd)
-                    rmsg = sd.recv(1000)
-                    if rmsg:
-                        receive_and_send(rmsg, sd)
-                    else:
-                        print("A client connection is broken!!")
+                    if sd in list(backwardlink.values()):
+                        # print('I am in tcp chatting', sd)
+                        rmsg = sd.recv(1000)
+                        if rmsg:
+                            receive_and_send(rmsg, sd)
+                    #     else:
+                    #         print("A client connection is broken!!")
+                    # else:
+                    #     print("unknown socket!")
 
 
 # TODO: is this the right termination?
@@ -668,23 +678,25 @@ def retain_forward_link(msg_check_mem, myHashID, msgID):
         forwardlink, backwardlink
     # get current member list
     rmsg_mem = query(msg_check_mem, roomchat_sock)
-    roomhash = rmsg_mem[0]
+    roomhash = rmsg_mem.split(':')[1] #rmsg_mem[0]
 
     retain_num = 0
 
     while not thread_end:
+        # print('I want to retain forward link')
 
         rmsg_mem = query(msg_check_mem, roomchat_sock)
+        # print('this is roomhash',roomhash, rmsg_mem.split(':')[1])
         if rmsg_mem.startswith("F:"):
             # this is the case that two simutaneous messages form a mal-formatted request
             continue
 
         # if the roomhash is changed, update the member list
-        if roomhash != rmsg_mem[0]:
+        if roomhash != rmsg_mem.split(':')[1]: #rmsg_mem[0]:
             retain_num += 1
             print("[P2P >retain_forw] retain_num: {}".format(retain_num))
 
-            roomhash = rmsg_mem[0]
+            roomhash = rmsg_mem.split(':')[1] #rmsg_mem[0]
             try:
                 mems = parse_members(rmsg_mem)
             except AssertionError:
@@ -726,6 +738,7 @@ def forward_link(gList, myHashID, sock_peers_TODO,
     :param my_tcp_conns: the list of connections, which needs to be closed in do_Quit()
     :return: sock_peers, msgID, my_tcp_conns
     '''
+    # print("I am in forward")
     global my_tcp_conns, forwardlink, sock_peers, multithread
     my_gList_ix = [my_gList_ix for my_gList_ix, item in enumerate(gList)
                    if item.HashID == myHashID][0]
