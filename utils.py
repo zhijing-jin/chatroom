@@ -57,7 +57,7 @@ def show_time(what_happens='', cat_server=False, printout=True):
     disp = disp + '\t' + what_happens if what_happens else disp
     if printout:
         print(disp)
-    curr_time = datetime.datetime.now().strftime('%m%d%H%M')
+    curr_time = datetime.datetime.now().strftime('%m%d%H%M-%S')
 
     if cat_server:
         hostname = socket.gethostname()
