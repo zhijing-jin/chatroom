@@ -701,6 +701,7 @@ def retain_forward_link(msg_check_mem, myHashID, msgID):
                                                                             roomname, username, myip, myport, msgID,
                                                                             MsgWin,
                                                                             my_tcp_conns)
+				print('[Info] the forward link has been updated', forwardlink)															
         time.sleep(1)
 
 
