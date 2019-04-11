@@ -2,14 +2,31 @@ import time
 from utils import sdbm_hash, show_time
 from collections import OrderedDict
 from tkinter import END
+import asyncio
 
 
 def query(msg_str, sockfd, recv_size=1000):
+    expected = {
+        "L:": "G:",
+        "J:": "M:",
+    }
     msg = str.encode(msg_str)
-    sockfd.send(msg)
-    rmsg = sockfd.recv(recv_size).decode("utf-8")
-    if rmsg == 'F:error message::\r\n':
-        print("[Error] F:error message, for input:", msg_str)
+
+    rmsg = "[Nothing]"
+    for _ in range(10):
+        check_header = (msg_str[:2], rmsg[:2])
+
+        sockfd.send(msg)
+        rmsg = sockfd.recv(recv_size).decode("utf-8")
+        if not ((msg_str in expected) and (check_header not in expected.items())):
+            break
+        else:
+            print("[inter >query] querying the {}th time".format(_))
+
+
+    if rmsg.startswith("F:"):
+        # if rmsg == 'F:error message::\r\n':
+        print("[Error] {} F error message: {}, for input: {}".format(show_time(), rmsg, msg_str))
 
     return rmsg
 
@@ -22,6 +39,7 @@ def parse_name(userentry, length=32):
 
     return name
 
+
 def parse_rmsg(msg_str, prefix="G:", suffix="::\r\n"):
     # G:Name1:Name2:Name3::\r\n
 
@@ -29,6 +47,7 @@ def parse_rmsg(msg_str, prefix="G:", suffix="::\r\n"):
     assert msg_str.endswith(suffix), "rmsg must end with {}".format(suffix)
     msg_str = msg_str[len(prefix): -len(suffix)]
     return msg_str.split(':')
+
 
 def parse_send_message(msg_str, prefix="T:", suffix="::\r\n"):
     assert msg_str.startswith(prefix), "rmsg must start with {}, not {}".format(prefix, msg_str)
@@ -43,6 +62,7 @@ def parse_send_message(msg_str, prefix="T:", suffix="::\r\n"):
         return None, None
     return msg_split[:4], msg_str[-msglength:]
 
+
 def handle_join_rmsg(rmsg, roomname, CmdWin, MsgWin):
     if rmsg[0] != 'F':
         outstr = "\n[Join] roomname: " + roomname
@@ -51,6 +71,7 @@ def handle_join_rmsg(rmsg, roomname, CmdWin, MsgWin):
         outstr = "\n[Join] Error - Request rejected: Already joined another chatroom!!"
         CmdWin.insert(1.0, outstr)
     MsgWin.insert(1.0, "\n[Join] received msg: {}".format(rmsg))
+
 
 def parse_members(msg_str, prefix="M:", suffix="::\r\n"):
     msg = parse_rmsg(msg_str, prefix=prefix, suffix=suffix)
@@ -72,8 +93,6 @@ def parse_members(msg_str, prefix="M:", suffix="::\r\n"):
     return gList
 
 
-
-
 class Member(object):
     def __init__(self, **kwargs):
         for key in kwargs:
@@ -91,10 +110,12 @@ def parse_memberships(msg_str, prefix="M:", suffix="::\r\n"):
     return msg_str.split(':')
 
 
-def keepalive(msg, sockfd, txt='', interval=20):
+async def keepalive(msg, sockfd, txt='', interval=20):
     while True:
         # second = datetime.datetime.now().strftime('%m%d%H%M-%S')[-2:]
         # if int(second) % 20 == 0:
-        time.sleep(interval)
-        # show_time(txt)
+        # if async:
+        await        asyncio.sleep(interval)
+        # time.sleep(interval)
+        show_time(txt)
         rmsg = query(msg, sockfd)
