@@ -54,7 +54,7 @@ my_tcp_server = None
 my_tcp_client = None
 my_tcp_conns = []
 my_udp_socket = None
-backwardlink = []  # backward links
+backwardlink = {}  # backward links {"hash": conn}
 forwardlink = []  # forward links
 multiproc = []  # a global list to manage the multi processing
 multithread = []  # a global list to manage the multithread work
@@ -222,7 +222,7 @@ def receive_and_send(rmsg, sending_sock):
         MsgWin.insert(1.0, "\n[{origin_username}] [ID: {msgID}]: {content}".format(origin_username=origin_username,
                                                                                    msgID=msgID, content=content))
 
-        my_connections = backwardlink
+        my_connections = list(backwardlink.values())
         if forwardlink:
             my_connections += [forwardlink]
         for sk in my_connections:
@@ -429,7 +429,7 @@ def do_Send():
 
     if forwardlink:
         forwardlink.send(str.encode(msg))
-    for bwl in backwardlink:
+    for bwl in list(backwardlink.values()):
         print('I send via', bwl)
         bwl.send(str.encode(msg))
     userentry.delete(0, END)
@@ -604,10 +604,6 @@ def build_tcp_server(msg_check_mem):
                         print("[build_tcp_server] Socket accept error: ", emsg)
                         break
 
-                    # add the backward link to connections
-                    backwardlink += [conn]
-                    RList += [conn]
-
                     # print out peer socket address information
                     print("[build_tcp_server] Connection established. Remote client info:", addr)
 
@@ -644,6 +640,11 @@ def build_tcp_server(msg_check_mem):
                         msg = 'S:{msgID}::\r\n'.format(msgID=msgID)
                         conn.send(str.encode(msg))
                         print("[build_tcp_server] Connection established with {}:{}".format(*rmsg[2:4]))
+
+                        # Step 6. add the backward link to connections
+                        backwardlink[client_hash] = conn
+                        print("[P2P >build_tcp_server] backward link first established: {}".format(backwardlink))
+                        RList += [conn]
                     else:
                         break
                 else:  # it could be forward or a backward link, I don't care
@@ -693,6 +694,9 @@ def retain_forward_link(msg_check_mem, myHashID, msgID):
             # import pdb;
             # pdb.set_trace()
             mem_hashes = set(mem.HashID for mem in mems)
+            print("[P2P >retain] backwardlink RIGHT BEFORE update: {}".format(backwardlink))
+            backwardlink = {k: v for k, v in backwardlink.items() if k in mem_hashes}
+            print("[P2P >retain] backwardlink RIGHT AFTER update: {}".format(backwardlink))
 
             # if the my forward server is no longer in the member list,
             # make a new forward link
@@ -701,6 +705,8 @@ def retain_forward_link(msg_check_mem, myHashID, msgID):
                                                                             roomname, username, myip, myport, msgID,
                                                                             MsgWin,
                                                                             my_tcp_conns)
+            print("[P2P >retain] forwardlink RIGHT AFTER update: {}".format(forwardlink))
+
         time.sleep(1)
 
 
