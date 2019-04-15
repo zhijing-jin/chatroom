@@ -592,7 +592,8 @@ def build_tcp_server(msg_check_mem, waiter):
         # incoming messages or 10 seconds
         try:
             show_time("**** before select.select")
-            Rready, Wready, Eready = select.select(RList, [], [], 10)
+            # Rready, Wready, Eready = select.select(RList, [], [], 10)
+            Rready, Wready, Eready = select.select(RList, [], [], 1)
             show_time("**** AFTER select.select")
 
         except select.error as emsg:
