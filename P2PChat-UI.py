@@ -58,6 +58,7 @@ forwardlink = None  # forward links
 multiproc = []  # a global list to manage the multi processing
 multithread = []  # a global list to manage the multithread work
 thread_end = False
+thread_event = threading.Event()
 
 ''' this is a super class for all the thread objects '''
 
@@ -95,11 +96,14 @@ class keepalive_thread(working_threads):
         self.msg = msg
         self.sockfd = sockfd
         self.txt = txt
+        self.waiter = threading.Event()
 
     def run(self):
         try:
             while not thread_end:
-                time.sleep(self.interval)
+                show_time("[P2P >keepalive] Start waiting")
+
+                self.waiter.wait(timeout=self.interval)
                 print('[P2P >keepalive] {} greetings from {} with thread {}'.format(show_time(), self.txt, self.name))
 
                 rmsg = query(self.msg, self.sockfd)
@@ -112,10 +116,11 @@ class server_thread(working_threads):
         working_threads.__init__(self)
         self.msg = msg
         self.name = name
+        self.waiter = threading.Event()
 
     def run(self):
         try:
-            build_tcp_server(self.msg)
+            build_tcp_server(self.msg, self.waiter)
         finally:
             print("{} internally ended".format(self.name))
 
@@ -356,6 +361,7 @@ def do_Join():
 
         t = keepalive_thread(msg_check_mem, roomchat_sock,
                              username)  # ing.Thread(target=tmp_test, args=(1,)) #target=keepalive, args=(msg_check_mem, roomchat_sock, username,))
+        t.daemon = True
         t.start()
         multithread += [t]
 
@@ -373,6 +379,7 @@ def do_Join():
         # p.start()
         # multiproc += [p]
         t = server_thread(msg_check_mem)
+        t.daemon = True
         t.start()
         multithread += [t]
         # print('[Info] out of server thread')
@@ -393,6 +400,7 @@ def do_Join():
         # p.start()
         # multiproc += [p]
         t = forwardlink_thread(msg_check_mem, myHashID, msgID)
+        t.daemon = True
         t.start()
         multithread += [t]
 
@@ -515,8 +523,7 @@ def do_Poke():
 def do_Quit():
     global my_tcp_server, my_tcp_conns, thread_end
     CmdWin.insert(1.0, "\nPress Quit")
-    roomchat_sock.close()
-    print("[Info] Closed socket")
+
 
     if my_tcp_server is not None:
         my_tcp_server.close()
@@ -534,17 +541,27 @@ def do_Quit():
     thread_end = True
     # for t in multithread:
     # 	t.raise_exception()
+    multithread_dict = {t.name: t for t in multithread}
+    show_time("[Info] multithread_dict:{}".format(multithread_dict))
 
-    for t in multithread:
+    for t_name in list(sorted(multithread_dict.keys())):
+        t = multithread_dict[t_name]
+        show_time("[----Info] {name} has joined".format(name=t.name))
+        if t_name == 'keep alive thread': t.waiter.set()
+        elif 'forwardlink thread': thread_event.set()
         t.raise_exception()
         t.join()
-        print("[Info] {name} has joined".format(name=t.name))
-    print("[Info] Closed multithreading")
+        show_time("[++++Info] {name} has joined".format(name=t.name))
+    show_time("[Info] Closed multithreading")
+
+    # last to close roomchat_sock because server_thread requires roomchat_sock
+    roomchat_sock.close()
+    print("[Info] Closed socket")
 
     sys.exit(0)
 
 
-def build_tcp_server(msg_check_mem):
+def build_tcp_server(msg_check_mem, waiter):
     global myip, myport, roomchat_sock, backwardlink, MsgWin, CmdWin, HID_msgID_dict
     # Step 1. create socket and bind
     sockfd = socket.socket()
@@ -564,7 +581,6 @@ def build_tcp_server(msg_check_mem):
 
     # add the listening socket to the READ socket list
 
-
     while not thread_end:
         RList = [sockfd, udp]
         # create an empty WRITE socket list
@@ -575,7 +591,10 @@ def build_tcp_server(msg_check_mem):
         # use select to wait for any incoming connection requests or
         # incoming messages or 10 seconds
         try:
+            show_time("**** before select.select")
             Rready, Wready, Eready = select.select(RList, [], [], 10)
+            show_time("**** AFTER select.select")
+
         except select.error as emsg:
             print("At select, caught an exception:", emsg)
             sys.exit(1)
@@ -680,7 +699,7 @@ def retain_forward_link(msg_check_mem, myHashID, msgID):
         forwardlink, backwardlink
     # get current member list
     rmsg_mem = query(msg_check_mem, roomchat_sock)
-    roomhash = rmsg_mem.split(':')[1] #rmsg_mem[0]
+    roomhash = rmsg_mem.split(':')[1]  # rmsg_mem[0]
 
     retain_num = 0
 
@@ -694,11 +713,11 @@ def retain_forward_link(msg_check_mem, myHashID, msgID):
             continue
 
         # if the roomhash is changed, update the member list
-        if roomhash != rmsg_mem.split(':')[1]: #rmsg_mem[0]:
+        if roomhash != rmsg_mem.split(':')[1]:  # rmsg_mem[0]:
             retain_num += 1
             print("[P2P >retain_forw] retain_num: {}".format(retain_num))
 
-            roomhash = rmsg_mem.split(':')[1] #rmsg_mem[0]
+            roomhash = rmsg_mem.split(':')[1]  # rmsg_mem[0]
             try:
                 mems = parse_members(rmsg_mem)
             except AssertionError:
@@ -720,7 +739,7 @@ def retain_forward_link(msg_check_mem, myHashID, msgID):
                                                                             my_tcp_conns)
             print("[P2P >retain] forwardlink RIGHT AFTER update: {}".format(forwardlink))
 
-        time.sleep(1)
+        thread_event.wait(timeout=1)
 
 
 def forward_link(gList, myHashID, sock_peers_TODO,
@@ -763,6 +782,7 @@ def forward_link(gList, myHashID, sock_peers_TODO,
 
             if forwardlink != False:
                 t = client_thread()
+                t.daemon = True
                 t.start()
                 multithread += [t]
                 print("[P2P >forward_link] out of client thread")

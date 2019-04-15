@@ -1,9 +1,14 @@
 # chatroom
 
 ## News (11 Apr)
-- Bug1: `do_Quit()` cannot kill `retain_forward_link` well
+- Bug1: `do_Quit()`: only need to paraphrase `Rready, Wready, Eready = select.select(RList, [], [], 10)`
 - Bug2: Sometimes the 1st message by `do_Send()` is duplicated.
-- We have demonstrated the other functions to Tutor. Good job :)!
+
+
+## New Progress:
+Zhijing debugged `do_Quit()`.
+- Action 1: close the threads in a certain order, because sockets need to be closed at last
+- Action 2: debugged `keepalive`-> abandoned `time.sleep()`, used `threading.Event().wait()` instead.
 
 ## Stage One (by Mar 26)
 Stage one includes the following functions:
