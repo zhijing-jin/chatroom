@@ -131,6 +131,8 @@ class client_thread(working_threads):
         try:
 
             while not thread_end:
+                if not forwardlink:
+                    continue
                 RList = [forwardlink]
                 # create an empty WRITE socket list
                 WList = []
