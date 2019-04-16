@@ -50,6 +50,7 @@ msgID = 0
 HID_msgID_dict = {}
 read_lock_HID_msgID_dict = threading.Lock()
 sem_lock_HID_msgID_dict = threading.Lock()
+write_lock_HID_msgID_dict = threading.Lock()
 readcount_HID_msgID_dict = 0
 
 sock_peers = {'backward': [],
@@ -214,7 +215,7 @@ def receive_and_send(rmsg, sending_sock):
     raw_msg = rmsg.decode("utf-8")
     if not raw_msg.startswith("T:"):
         return
-    msg_split, content = parse_send_message()
+    msg_split, content = parse_send_message(raw_msg)
     print(msg_split, content)
     if msg_split:  # otherwise the msg format is incorrect
         origin_roomname = msg_split[0]
@@ -687,6 +688,7 @@ def build_tcp_server(msg_check_mem):
                         gList = parse_members(rmsg_mems)
                         mem_hashes = set(mem.HashID for mem in gList)
                         HID_msgID_dict[str(client_hash)] = msgID
+                        print('[Debug] I set {} to {}'.format(rmsg[1], msgID))
 
                         if not client_hash in mem_hashes:
                             print("[Error] Detected non-member connection. Closing.")
