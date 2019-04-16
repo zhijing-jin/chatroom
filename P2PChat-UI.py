@@ -159,7 +159,7 @@ class client_thread(working_threads):
                     for sd in Rready:
                         if not sd:
                             continue
-                        sd.settimeout(0.1);
+                        sd.settimeout(0.1)
                         # print('Client is ready in tcp chatting', forwardlink)
 
                         try:
@@ -503,7 +503,7 @@ def do_Poke():
               (membermsg[idx + 1], int(membermsg[idx + 2])), flush=False)
 
         my_udp_socket.sendto(str.encode(msg), (membermsg[idx + 1], int(membermsg[idx + 2])))
-        my_udp_socket.settimeout(2);
+        my_udp_socket.settimeout(2)
 
         try:
             rmsg = my_udp_socket.recvfrom(1000)  # .decode("utf-8")
@@ -523,7 +523,6 @@ def do_Poke():
 def do_Quit():
     global my_tcp_server, my_tcp_conns, thread_end
     CmdWin.insert(1.0, "\nPress Quit")
-
 
     if my_tcp_server is not None:
         my_tcp_server.close()
@@ -547,8 +546,10 @@ def do_Quit():
     for t_name in list(sorted(multithread_dict.keys())):
         t = multithread_dict[t_name]
         show_time("[----Info] {name} has joined".format(name=t.name))
-        if t_name == 'keep alive thread': t.waiter.set()
-        elif 'forwardlink thread': thread_event.set()
+        if t_name == 'keep alive thread':
+            t.waiter.set()
+        elif 'forwardlink thread':
+            thread_event.set()
         t.raise_exception()
         t.join()
         show_time("[++++Info] {name} has joined".format(name=t.name))
@@ -591,11 +592,8 @@ def build_tcp_server(msg_check_mem, waiter):
         # use select to wait for any incoming connection requests or
         # incoming messages or 10 seconds
         try:
-            show_time("**** before select.select")
             # Rready, Wready, Eready = select.select(RList, [], [], 10)
             Rready, Wready, Eready = select.select(RList, [], [], 1)
-            show_time("**** AFTER select.select")
-
         except select.error as emsg:
             print("At select, caught an exception:", emsg)
             sys.exit(1)
@@ -772,7 +770,8 @@ def forward_link(gList, myHashID, sock_peers_TODO,
     while gList[start].HashID != myHashID:
         print("[loop gList] start:", start)
 
-        if gList[start].HashID in sock_peers['backward']:
+        # if gList[start].HashID in sock_peers['backward']:
+        if gList[start].HashID in backwardlink:
             start = (start + 1) % len(gList)
         else:
             forwardlink = build_tcp_client(gList[start].ip, gList[start].port)

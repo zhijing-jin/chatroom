@@ -43,15 +43,15 @@ def parse_name(userentry, length=32):
 def parse_rmsg(msg_str, prefix="G:", suffix="::\r\n"):
     # G:Name1:Name2:Name3::\r\n
 
-    assert msg_str.startswith(prefix), "rmsg must start with {}, not {}".format(prefix, msg_str)
-    assert msg_str.endswith(suffix), "rmsg must end with {}".format(suffix)
+    if not msg_str.startswith(prefix): print ("[Error] rmsg must start with {}, not {}".format(prefix, msg_str))
+    if not msg_str.endswith(suffix): print ("[Error] rmsg must end with {}".format(suffix))
     msg_str = msg_str[len(prefix): -len(suffix)]
     return msg_str.split(':')
 
 
 def parse_send_message(msg_str, prefix="T:", suffix="::\r\n"):
-    assert msg_str.startswith(prefix), "rmsg must start with {}, not {}".format(prefix, msg_str)
-    assert msg_str.endswith(suffix), "rmsg must end with {}".format(suffix)
+    if not msg_str.startswith(prefix): print ("[Error] rmsg must start with {}, not {}".format(prefix, msg_str))
+    if not msg_str.endswith(suffix): print ("[Error] rmsg must end with {}".format(suffix))
     msg_str = msg_str[len(prefix): -len(suffix)]
     msg_split = msg_str.split(':')
     if len(msg_split) < 5:
