@@ -65,34 +65,15 @@ multithread = []  # a global list to manage the multithread work
 thread_end = False
 thread_event = threading.Event()
 
-''' this is a super class for all the thread objects '''
+#
+# For test options
+#
+use_debug_botton = False
 
-
-# def StartRead(read_lock, sem_lock, readcount):
-#     global read_lock, sem_lock, readcount
-#     read_lock.acquire()
-#     readcount += 1
-#     if readcount == 1:
-#         sem_lock.acquire()
-#     read_lock.release()
-#
-# def EndRead(read_lock, sem_lock, readcount):
-#     global read_lock, sem_lock, readcount
-#     read_lock.acquire()
-#     readcount -= 1
-#     if readcount == 0:
-#         sem_lock.release()
-#     read_lock.release()
-#
-# def StartWrite(sem_lock):
-#     global sem_lock
-#     sem_lock.acquire()
-#
-# def EndWrite(sem_lock):
-#     global sem_lock
-#     sem_lock.release()
 
 class working_threads(threading.Thread):
+    ''' this is a super class for all the thread objects '''
+
     def __init__(self):
         threading.Thread.__init__(self)
 
@@ -383,7 +364,7 @@ def do_Join():
         else:
             CmdWin.insert(1.0, "\n[Error] Already in a room. Cannot change rooms.")
     else:
-#         CmdWin.insert(1.0, "\n[Info] Your client socket: {}".format(roomchat_sock.getsockname()))
+        #         CmdWin.insert(1.0, "\n[Info] Your client socket: {}".format(roomchat_sock.getsockname()))
 
         roomname = name
         # Step 1. join the chatroom, by sending msg to chatroom app
@@ -859,15 +840,15 @@ def forward_link(gList, myHashID, sock_peers_TODO,
 
 def do_Debug():
     f_link_name = str(forwardlink).split('laddr=')[-1] if forwardlink else forwardlink
-    print('[Debug] {} forward_link: {}'.format(show_time(printout=False),f_link_name))
+    print('[Debug] {} forward_link: {}'.format(show_time(printout=False), f_link_name))
 
-    MsgWin.insert(1.0, '\n[Debug] {} forward_link: {}'.format(show_time(printout=False),f_link_name))
+    MsgWin.insert(1.0, '\n[Debug] {} forward_link: {}'.format(show_time(printout=False), f_link_name))
 
     b_link_names = [str(backwardlink[bw].getpeername()[-1]) for bw in backwardlink]
     b_link_names = ', '.join(b_link_names)
-    print('[Debug] {} backward_links: {}'.format(show_time(printout=False), b_link_names) )
+    print('[Debug] {} backward_links: {}'.format(show_time(printout=False), b_link_names))
 
-    MsgWin.insert(1.0, '\n[Debug] {} backward_links: {}'.format(show_time(printout=False), b_link_names) )
+    MsgWin.insert(1.0, '\n[Debug] {} backward_links: {}'.format(show_time(printout=False), b_link_names))
 
 
 # manager = mul\tiprocessing.Manager()
@@ -911,9 +892,11 @@ Butt06.pack(side=LEFT, padx=8, pady=8)
 Butt05 = Button(topmidframe, width='6', relief=RAISED,
                 text="Quit", command=do_Quit)
 Butt05.pack(side=LEFT, padx=8, pady=8)
-Butt07 = Button(topmidframe, width='6', relief=RAISED,
-                text="Debug", command=do_Debug)
-Butt07.pack(side=LEFT, padx=8, pady=8)
+
+if use_debug_botton:
+    Butt07 = Button(topmidframe, width='6', relief=RAISED,
+                    text="Debug", command=do_Debug)
+    Butt07.pack(side=LEFT, padx=8, pady=8)
 
 # Lower Middle Frame for User input
 lowmidframe = Frame(win, relief=RAISED, borderwidth=1)
