@@ -67,6 +67,7 @@ thread_event = threading.Event()
 
 ''' this is a super class for all the thread objects '''
 
+
 # def StartRead(read_lock, sem_lock, readcount):
 #     global read_lock, sem_lock, readcount
 #     read_lock.acquire()
@@ -153,6 +154,7 @@ class client_thread(working_threads):
     '''
     only related to do_Send
     '''
+
     def __init__(self, name='client thread'):
         working_threads.__init__(self)
         self.name = name
@@ -164,7 +166,7 @@ class client_thread(working_threads):
 
             while not thread_end:
                 if not forwardlink:
-                    thread_event.wait(0.5) # not making this check too frequent and delay other threads
+                    thread_event.wait(0.5)  # not making this check too frequent and delay other threads
                     continue
                 RList = [forwardlink]
                 # create an empty WRITE socket list
@@ -174,7 +176,7 @@ class client_thread(working_threads):
                 # use select to wait for any incoming connection requests or
                 # incoming messages or 10 seconds
                 try:
-                    Rready, Wready, Eready = select.select(RList, [], [], 1)
+                    Rready, Wready, Eready = select.select(RList, [], [], 0.5)
                 except select.error as emsg:
                     print("At select, caught an exception:", emsg)
                     sys.exit(1)
@@ -208,8 +210,6 @@ def err(msg='We encounter an error'):
     print('[Error] {}'.format(msg))
 
 
-
-
 '''
 sending_sock is where the message comes from, and therefore not necessary to resend message to him
 '''
@@ -232,7 +232,7 @@ def receive_and_send(rmsg, sending_sock):
         if origin_roomname != roomname:
             print('this is not my room')
             return
-            
+
         if originHID in HID_msgID_dict:
             print('I know this guy, last msgid {} this msgid {}'.format(HID_msgID_dict[originHID], msgID))
         else:
@@ -242,29 +242,30 @@ def receive_and_send(rmsg, sending_sock):
             err('we have recorded this message')
             return
 
-        if not originHID in HID_msgID_dict:
-            # handle the case that this is an unknown peer
-            print("[Info] I don't know this guy, add it to my dict")
-            msg_check_mem = 'J:{roomname}:{username}:{userIP}:{port}::\r\n'. \
-                format(roomname=roomname, username=username,
-                       userIP=myip, port=myport)
-            try:
-                newmsg = query(msg_check_mem, roomchat_sock)
-                membermsg = parse_memberships(newmsg)
-                memberships = membermsg[1::3]
-            except:
-                err('Fail to ask roomserver about the unknown sender')
-            if not newmsg or newmsg[0] == 'F':
-                err('Fail to ask roomserver about the unknown sender')
-                return
+        with write_lock_HID_msgID_dict:
+            if not originHID in HID_msgID_dict:
+                # handle the case that this is an unknown peer
+                print("[Info] I don't know this guy, add it to my dict")
+                msg_check_mem = 'J:{roomname}:{username}:{userIP}:{port}::\r\n'. \
+                    format(roomname=roomname, username=username,
+                           userIP=myip, port=myport)
+                try:
+                    newmsg = query(msg_check_mem, roomchat_sock)
+                    membermsg = parse_memberships(newmsg)
+                    memberships = membermsg[1::3]
+                except:
+                    err('Fail to ask roomserver about the unknown sender')
+                if not newmsg or newmsg[0] == 'F':
+                    err('Fail to ask roomserver about the unknown sender')
+                    return
 
-            try:
-                # if cannot find him in the group list, report an error
-                idx = memberships.index(origin_username)
-            except:
-                err('Fail to find sender: {} in this chatroom'.format(origin_username))
-                return
-            print("[Info] upon asking for this unknown, I get", newmsg)
+                try:
+                    # if cannot find him in the group list, report an error
+                    idx = memberships.index(origin_username)
+                except:
+                    err('Fail to find sender: {} in this chatroom'.format(origin_username))
+                    return
+                print("[Info] upon asking for this unknown, I get", newmsg)
 
         HID_msgID_dict[originHID] = int(msgID)
         MsgWin.insert(1.0, "\n[{origin_username}] [ID: {msgID}]: {content}".format(origin_username=origin_username,
@@ -622,7 +623,6 @@ def build_tcp_server(msg_check_mem):
 
     # add the listening socket to the READ socket list
 
-
     while not thread_end:
         RList = [sockfd, udp]
         # create an empty WRITE socket list
@@ -633,7 +633,7 @@ def build_tcp_server(msg_check_mem):
         # use select to wait for any incoming connection requests or
         # incoming messages or 10 seconds
         try:
-            Rready, Wready, Eready = select.select(RList, [], [], 1)
+            Rready, Wready, Eready = select.select(RList, [], [], 0.5)
         except select.error as emsg:
             print("At select, caught an exception:", emsg)
             sys.exit(1)
@@ -740,7 +740,7 @@ def retain_forward_link(msg_check_mem, myHashID, msgID):
         forwardlink, backwardlink, HID_msgID_dict
     # get current member list
     rmsg_mem = query(msg_check_mem, roomchat_sock)
-    roomhash = rmsg_mem.split(':')[1] #rmsg_mem[0]
+    roomhash = rmsg_mem.split(':')[1]  # rmsg_mem[0]
 
     retain_num = 0
 
@@ -754,11 +754,11 @@ def retain_forward_link(msg_check_mem, myHashID, msgID):
             continue
 
         # if the roomhash is changed, update the member list
-        if roomhash != rmsg_mem.split(':')[1]: #rmsg_mem[0]:
+        if roomhash != rmsg_mem.split(':')[1]:  # rmsg_mem[0]:
             retain_num += 1
             print("[P2P >retain_forw] retain_num: {}".format(retain_num))
 
-            roomhash = rmsg_mem.split(':')[1] #rmsg_mem[0]
+            roomhash = rmsg_mem.split(':')[1]  # rmsg_mem[0]
             try:
                 mems = parse_members(rmsg_mem)
             except AssertionError:
@@ -856,17 +856,20 @@ def forward_link(gList, myHashID, sock_peers_TODO,
                 start = (start + 1) % len(gList)
     return sock_peers, msgID, my_tcp_conns, forwardlink
 
+
 def do_Debug():
     f_link_name = str(forwardlink).split('laddr=')[-1] if forwardlink else forwardlink
-    print('[Debug] forward_link: {}'.format(f_link_name))
+    print('[Debug] {} forward_link: {}'.format(show_time(printout=False),f_link_name))
 
-    MsgWin.insert(1.0, '\n[Debug] forward_link: {}'.format(f_link_name) )
+    MsgWin.insert(1.0, '\n[Debug] {} forward_link: {}'.format(show_time(printout=False),f_link_name))
 
     b_link_names = [str(backwardlink[bw].getpeername()[-1]) for bw in backwardlink]
     b_link_names = ', '.join(b_link_names)
-    print('[Debug] backward_links: ' + b_link_names)
+    print('[Debug] {} backward_links: {}'.format(show_time(printout=False), b_link_names) )
 
-    MsgWin.insert(1.0, '\n[Debug] backward_links: ' + b_link_names)
+    MsgWin.insert(1.0, '\n[Debug] {} backward_links: {}'.format(show_time(printout=False), b_link_names) )
+
+
 # manager = mul\tiprocessing.Manager()
 #
 # Set up of Basic UI
