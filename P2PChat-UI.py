@@ -181,7 +181,7 @@ class client_thread(working_threads):
                     for sd in Rready:
                         if not sd:
                             continue
-                        sd.settimeout(0.1);
+                        sd.settimeout(0.1)
                         # print('Client is ready in tcp chatting', forwardlink)
 
                         try:
@@ -537,7 +537,7 @@ def do_Poke():
               (membermsg[idx + 1], int(membermsg[idx + 2])), flush=False)
 
         my_udp_socket.sendto(str.encode(msg), (membermsg[idx + 1], int(membermsg[idx + 2])))
-        my_udp_socket.settimeout(2);
+        my_udp_socket.settimeout(2)
 
         try:
             rmsg = my_udp_socket.recvfrom(1000)  # .decode("utf-8")
@@ -557,8 +557,6 @@ def do_Poke():
 def do_Quit():
     global my_tcp_server, my_tcp_conns, thread_end
     CmdWin.insert(1.0, "\nPress Quit")
-    roomchat_sock.close()
-    print("[Info] Closed socket")
 
     if my_tcp_server is not None:
         my_tcp_server.close()
@@ -576,12 +574,21 @@ def do_Quit():
     thread_end = True
     # for t in multithread:
     # 	t.raise_exception()
+    multithread_dict = {t.name: t for t in multithread}
+    show_time("[Info] multithread_dict:{}".format(multithread_dict))
 
-    for t in multithread:
+    for t_name in list(sorted(multithread_dict.keys())):
+        t = multithread_dict[t_name]
+        show_time("[----Info] {name} has joined".format(name=t.name))
+
         t.raise_exception()
         t.join()
-        print("[Info] {name} has joined".format(name=t.name))
-    print("[Info] Closed multithreading")
+        show_time("[++++Info] {name} has joined".format(name=t.name))
+    show_time("[Info] Closed multithreading")
+
+    # last to close roomchat_sock because server_thread requires roomchat_sock
+    roomchat_sock.close()
+    print("[Info] Closed socket")
 
     sys.exit(0)
 
