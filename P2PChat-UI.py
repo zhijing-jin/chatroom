@@ -232,7 +232,7 @@ def receive_and_send(rmsg, sending_sock):
         if origin_roomname != roomname:
             print('this is not my room')
             return
-
+            
         if originHID in HID_msgID_dict:
             print('I know this guy, last msgid {} this msgid {}'.format(HID_msgID_dict[originHID], msgID))
         else:
@@ -242,31 +242,29 @@ def receive_and_send(rmsg, sending_sock):
             err('we have recorded this message')
             return
 
-        with write_lock_HID_msgID_dict:
-            if not originHID in HID_msgID_dict:
+        if not originHID in HID_msgID_dict:
+            # handle the case that this is an unknown peer
+            print("[Info] I don't know this guy, add it to my dict")
+            msg_check_mem = 'J:{roomname}:{username}:{userIP}:{port}::\r\n'. \
+                format(roomname=roomname, username=username,
+                       userIP=myip, port=myport)
+            try:
+                newmsg = query(msg_check_mem, roomchat_sock)
+                membermsg = parse_memberships(newmsg)
+                memberships = membermsg[1::3]
+            except:
+                err('Fail to ask roomserver about the unknown sender')
+            if not newmsg or newmsg[0] == 'F':
+                err('Fail to ask roomserver about the unknown sender')
+                return
 
-                # handle the case that this is an unknown peer
-                print("[Info] I don't know this guy, add it to my dict")
-                msg_check_mem = 'J:{roomname}:{username}:{userIP}:{port}::\r\n'. \
-                    format(roomname=roomname, username=username,
-                           userIP=myip, port=myport)
-                try:
-                    newmsg = query(msg_check_mem, roomchat_sock)
-                    membermsg = parse_memberships(newmsg)
-                    memberships = membermsg[1::3]
-                except:
-                    err('Fail to ask roomserver about the unknown sender')
-                if not newmsg or newmsg[0] == 'F':
-                    err('Fail to ask roomserver about the unknown sender')
-                    return
-
-                try:
-                    # if cannot find him in the group list, report an error
-                    idx = memberships.index(origin_username)
-                except:
-                    err('Fail to find sender: {} in this chatroom'.format(origin_username))
-                    return
-                print("[Info] upon asking for this unknown, I get", newmsg)
+            try:
+                # if cannot find him in the group list, report an error
+                idx = memberships.index(origin_username)
+            except:
+                err('Fail to find sender: {} in this chatroom'.format(origin_username))
+                return
+            print("[Info] upon asking for this unknown, I get", newmsg)
 
         HID_msgID_dict[originHID] = int(msgID)
         MsgWin.insert(1.0, "\n[{origin_username}] [ID: {msgID}]: {content}".format(origin_username=origin_username,
@@ -384,6 +382,8 @@ def do_Join():
         else:
             CmdWin.insert(1.0, "\n[Error] Already in a room. Cannot change rooms.")
     else:
+        CmdWin.insert(1.0, "\n[Error] Already in a room. Cannot change rooms.".format(roomchat_sock.getsockname()))
+
         roomname = name
         # Step 1. join the chatroom, by sending msg to chatroom app
         msg_check_mem = 'J:{roomname}:{username}:{userIP}:{port}::\r\n'. \
