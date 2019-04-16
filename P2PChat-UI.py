@@ -174,7 +174,7 @@ class client_thread(working_threads):
                 # use select to wait for any incoming connection requests or
                 # incoming messages or 10 seconds
                 try:
-                    Rready, Wready, Eready = select.select(RList, [], [], 10)
+                    Rready, Wready, Eready = select.select(RList, [], [], 1)
                 except select.error as emsg:
                     print("At select, caught an exception:", emsg)
                     sys.exit(1)
@@ -630,7 +630,7 @@ def build_tcp_server(msg_check_mem):
         # use select to wait for any incoming connection requests or
         # incoming messages or 10 seconds
         try:
-            Rready, Wready, Eready = select.select(RList, [], [], 10)
+            Rready, Wready, Eready = select.select(RList, [], [], 1)
         except select.error as emsg:
             print("At select, caught an exception:", emsg)
             sys.exit(1)
