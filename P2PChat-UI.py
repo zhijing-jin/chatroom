@@ -55,12 +55,12 @@ readcount_HID_msgID_dict = 0
 
 sock_peers = {'backward': [],
               'forward': None}  # backward holds a list of hasIDs [hashID], forward holds hashID where this p2p is pointing at
-my_tcp_server = None
-my_tcp_conns = []
-my_udp_socket = None
+my_tcp_server = None # response to send msg and build new connection
+my_udp_server = None # repsonse to poke with ACK
+my_udp_client = None # sending poke
+my_tcp_conns = [] # all the connections that need to close at the end
 backwardlink = {}  # backward links {"hash": conn}
 forwardlink = None  # forward links
-multiproc = []  # a global list to manage the multi processing
 multithread = []  # a global list to manage the multithread work
 thread_end = False
 thread_event = threading.Event()
@@ -467,7 +467,7 @@ def do_Send():
 
 
 def do_Poke():
-    global my_udp_socket
+    global my_udp_client
     if not username:
         CmdWin.insert(1.0, "\n[Error] You must have a username first.")
         return
@@ -513,8 +513,8 @@ def do_Poke():
             CmdWin.insert(1.0, "\n[Poke] That member has left the chat room. To whom you want to send the poke?")
             return
 
-        if not my_udp_socket:
-            my_udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        if not my_udp_client:
+            my_udp_client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         msg = 'K:{roomname}:{username}::\r\n'.format(roomname=roomname, username=username)
 
 
@@ -522,11 +522,11 @@ def do_Poke():
               (membermsg[idx + 1], int(membermsg[idx + 2])), flush=False)
 
         CmdWin.insert(1.0,"\n[Poke] Have sent a poke to {}".format(targetname))
-        my_udp_socket.sendto(str.encode(msg), (membermsg[idx + 1], int(membermsg[idx + 2])))
-        my_udp_socket.settimeout(2)
+        my_udp_client.sendto(str.encode(msg), (membermsg[idx + 1], int(membermsg[idx + 2])))
+        my_udp_client.settimeout(2)
 
         try:
-            rmsg = my_udp_socket.recvfrom(1000)  # .decode("utf-8")
+            rmsg = my_udp_client.recvfrom(1000)  # .decode("utf-8")
         except socket.timeout:
             CmdWin.insert(1.0, "\n[Error] Your [Poke] was not sent successfully")
             return
@@ -541,7 +541,7 @@ def do_Poke():
 
 
 def do_Quit():
-    global my_tcp_server, my_tcp_conns, thread_end
+    global my_tcp_server, my_tcp_conns, thread_end, my_udp_client, my_udp_server
     CmdWin.insert(1.0, "\n[Quit] Quitting now.")
 
     # Step 1. close the my TCP server and all its connections
@@ -550,6 +550,12 @@ def do_Quit():
         for conn in my_tcp_conns:
             conn.close()
         print("[Info] Closed tcp_conn, tcp_server")
+    if my_udp_client:
+        my_udp_client.close()
+        print("[Info] Closed udp_client")
+    if my_udp_server:
+        my_udp_server.close()
+        print("[Info] Closed udp_server")
 
     # Step 2. end the threads
     thread_end = True
@@ -589,14 +595,14 @@ def do_Debug():
 
 
 def build_tcp_server(msg_check_mem):
-    global myip, myport, roomchat_sock, backwardlink, MsgWin, CmdWin, HID_msgID_dict
+    global myip, myport, roomchat_sock, backwardlink, MsgWin, CmdWin, HID_msgID_dict, my_tcp_server, my_udp_server
     # Step 1. create socket and bind
-    sockfd = socket.socket()
-    udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    my_tcp_server = socket.socket()
+    my_udp_server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
     try:
-        sockfd.bind((myip, myport))
-        udp.bind((myip, myport))
+        my_tcp_server.bind((myip, myport))
+        my_udp_server.bind((myip, myport))
     except socket.error as emsg:
         print("[build_tcp_server] Socket bind error: ", emsg)
         sys.exit(1)
@@ -604,16 +610,23 @@ def build_tcp_server(msg_check_mem):
     print("[build_tcp_server] SERVER established at {}:{}".format(myip, myport))
 
     # Step 2. listen
-    sockfd.listen(5)
+    my_tcp_server.listen(5)
 
     # add the listening socket to the READ socket list
 
     while not thread_end:
-        RList = [sockfd, udp]
+        RList = []
+        if my_tcp_server:
+            RList += [my_tcp_server]
+        if my_udp_server:
+            RList += [my_udp_server]
         # create an empty WRITE socket list
         WList = []
         for bwl in list(backwardlink.values()):
             RList += [bwl]
+        if len(RList) == 0:
+            thread_event.wait(0.5)  # not making this check too frequent and delay other threads
+            continue
 
         # use select to wait for any incoming connection requests or
         # incoming messages or 10 seconds
@@ -631,7 +644,7 @@ def build_tcp_server(msg_check_mem):
             # print('I am very busy', Rready, RList, backwardlink)
             # for each socket in the READ ready list
             for sd in Rready:
-                if sd == udp:
+                if sd == my_udp_server:
                     print('I am in udp')
                     msg, addr = sd.recvfrom(1024)
                     print("we receiver the msg", msg, flush=False)
@@ -644,7 +657,7 @@ def build_tcp_server(msg_check_mem):
                         MsgWin.insert(1.0, "\n~~~~~~~~~~~~~[{}]Poke~~~~~~~~~~~~~~".format(rmsg[1]))
                         CmdWin.insert(1.0, "\nReceived a poke from {}".format(rmsg[1]))
                         sd.sendto(str.encode("A::\r\n"), addr)
-                elif sd == sockfd:
+                elif sd == my_tcp_server:
                     print('I am in tcp establishing')
 
                     # Step 3. accept new connection
