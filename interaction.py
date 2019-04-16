@@ -5,6 +5,12 @@ from tkinter import END
 import asyncio
 
 
+class Member(object):
+    def __init__(self, **kwargs):
+        for key in kwargs:
+            setattr(self, key, kwargs[key])
+
+
 def query(msg_str, sockfd, recv_size=1000):
     expected = {
         "L:": "G:",
@@ -21,8 +27,7 @@ def query(msg_str, sockfd, recv_size=1000):
         if not ((msg_str in expected) and (check_header not in expected.items())):
             break
         else:
-            print("[inter >query] querying the {}th time".format(_))
-
+            print("[interaction.py >query] querying the {}th time".format(_))
 
     if rmsg.startswith("F:"):
         # if rmsg == 'F:error message::\r\n':
@@ -84,6 +89,7 @@ def parse_members(msg_str, prefix="M:", suffix="::\r\n"):
     msg = parse_rmsg(msg_str, prefix=prefix, suffix=suffix)
     # M:15384212722403738702:u1:localhost:32340:u2:localhost:32340:u3:localhost:32340::
     # 15384212722403738702:u1:localhost:32340:u2:localhost:32340:u3:localhost:32340
+
     MSID = msg[0]
     mem_msg = msg[1:]
     mems = []
@@ -100,29 +106,12 @@ def parse_members(msg_str, prefix="M:", suffix="::\r\n"):
     return gList
 
 
-class Member(object):
-    def __init__(self, **kwargs):
-        for key in kwargs:
-            setattr(self, key, kwargs[key])
-
-
 def parse_memberships(msg_str, prefix="M:", suffix="::\r\n"):
     # G:Name1:Name2:Name3::\r\n
+    if not msg_str.startswith(prefix): print ("[Error] rmsg must start with {}, not {}".format(prefix, msg_str))
+    if not msg_str.endswith(suffix): print ("[Error] rmsg must end with {}".format(suffix))
 
-    assert msg_str.startswith(prefix), "Memberships must start with {}".format(prefix)
-    assert msg_str.endswith(suffix), "Memberships must end with {}".format(suffix)
     msg_str = msg_str[len(prefix): -len(suffix)]
 
     # user_ID:IP:port
     return msg_str.split(':')
-
-
-async def keepalive(msg, sockfd, txt='', interval=20):
-    while True:
-        # second = datetime.datetime.now().strftime('%m%d%H%M-%S')[-2:]
-        # if int(second) % 20 == 0:
-        # if async:
-        await        asyncio.sleep(interval)
-        # time.sleep(interval)
-        show_time(txt)
-        rmsg = query(msg, sockfd)
