@@ -48,6 +48,10 @@ msgID = 0
 # this will include myself, so that when my message is sent back to me, I know not to resend it
 # HID as str, msgID as int
 HID_msgID_dict = {}
+read_lock_HID_msgID_dict = threading.Lock()
+sem_lock_HID_msgID_dict = threading.Lock()
+readcount_HID_msgID_dict = 0
+
 sock_peers = {'backward': [],
               'forward': None}  # backward holds a list of hasIDs [hashID], forward holds hashID where this p2p is pointing at
 my_tcp_server = None
@@ -58,10 +62,32 @@ forwardlink = None  # forward links
 multiproc = []  # a global list to manage the multi processing
 multithread = []  # a global list to manage the multithread work
 thread_end = False
-thread_event = threading.Event()
 
 ''' this is a super class for all the thread objects '''
 
+# def StartRead(read_lock, sem_lock, readcount):
+#     global read_lock, sem_lock, readcount
+#     read_lock.acquire()
+#     readcount += 1
+#     if readcount == 1:
+#         sem_lock.acquire()
+#     read_lock.release()
+#
+# def EndRead(read_lock, sem_lock, readcount):
+#     global read_lock, sem_lock, readcount
+#     read_lock.acquire()
+#     readcount -= 1
+#     if readcount == 0:
+#         sem_lock.release()
+#     read_lock.release()
+#
+# def StartWrite(sem_lock):
+#     global sem_lock
+#     sem_lock.acquire()
+#
+# def EndWrite(sem_lock):
+#     global sem_lock
+#     sem_lock.release()
 
 class working_threads(threading.Thread):
     def __init__(self):
@@ -96,14 +122,11 @@ class keepalive_thread(working_threads):
         self.msg = msg
         self.sockfd = sockfd
         self.txt = txt
-        self.waiter = threading.Event()
 
     def run(self):
         try:
             while not thread_end:
-                show_time("[P2P >keepalive] Start waiting")
-
-                self.waiter.wait(timeout=self.interval)
+                time.sleep(self.interval)
                 print('[P2P >keepalive] {} greetings from {} with thread {}'.format(show_time(), self.txt, self.name))
 
                 rmsg = query(self.msg, self.sockfd)
@@ -116,11 +139,10 @@ class server_thread(working_threads):
         working_threads.__init__(self)
         self.msg = msg
         self.name = name
-        self.waiter = threading.Event()
 
     def run(self):
         try:
-            build_tcp_server(self.msg, self.waiter)
+            build_tcp_server(self.msg)
         finally:
             print("{} internally ended".format(self.name))
 
@@ -159,12 +181,13 @@ class client_thread(working_threads):
                     for sd in Rready:
                         if not sd:
                             continue
-                        sd.settimeout(0.1)
+                        sd.settimeout(0.1);
                         # print('Client is ready in tcp chatting', forwardlink)
 
                         try:
                             rmsg = sd.recv(1000)  # .decode("utf-8")
                             if rmsg:
+                                print('[Debug] receive and send from client thread')
                                 receive_and_send(rmsg, forwardlink)
                             # else:
                             #     print("A client connection is broken!!")
@@ -179,6 +202,8 @@ def err(msg='We encounter an error'):
     print('[Error] {}'.format(msg))
 
 
+
+
 '''
 sending_sock is where the message comes from, and therefore not necessary to resend message to him
 '''
@@ -186,19 +211,27 @@ sending_sock is where the message comes from, and therefore not necessary to res
 
 def receive_and_send(rmsg, sending_sock):
     global HID_msgID_dict, roomchat_sock
-    print('this is rmsg', rmsg)
-    msg_split, content = parse_send_message(rmsg.decode("utf-8"))
+    raw_msg = rmsg.decode("utf-8")
+    if not raw_msg.startswith("T:"):
+        return
+    msg_split, content = parse_send_message()
     print(msg_split, content)
     if msg_split:  # otherwise the msg format is incorrect
         origin_roomname = msg_split[0]
         originHID = msg_split[1]
         origin_username = msg_split[2]
         msgID = msg_split[3]
-        print(origin_roomname, originHID, origin_username, msgID, content)
+        print('I receive', origin_roomname, originHID, origin_username, msgID, content, sending_sock)
 
         if origin_roomname != roomname:
             print('this is not my room')
             return
+
+        if originHID in HID_msgID_dict:
+            print('I know this guy, last msgid {} this msgid {}'.format(HID_msgID_dict[originHID], msgID))
+        else:
+            print('I do not know this guy')
+
         if originHID in HID_msgID_dict and int(HID_msgID_dict[originHID]) >= int(msgID):
             err('we have recorded this message')
             return
@@ -231,12 +264,13 @@ def receive_and_send(rmsg, sending_sock):
         MsgWin.insert(1.0, "\n[{origin_username}] [ID: {msgID}]: {content}".format(origin_username=origin_username,
                                                                                    msgID=msgID, content=content))
 
-        my_connections = list(backwardlink.values())
         if forwardlink:
-            my_connections += [forwardlink]
-        for sk in my_connections:
-            if sk != sending_sock:
-                sk.send(rmsg)
+            forwardlink.send(rmsg)
+            print('[Debug] I am sending to', forwardlink)
+        for sk in backwardlink:
+            if backwardlink[sk] != sending_sock:
+                print('[Debug] I am sending to', backwardlink[sk].getpeername())
+                backwardlink[sk].send(rmsg)
 
     else:
         print('incorrect msg format')
@@ -361,7 +395,6 @@ def do_Join():
 
         t = keepalive_thread(msg_check_mem, roomchat_sock,
                              username)  # ing.Thread(target=tmp_test, args=(1,)) #target=keepalive, args=(msg_check_mem, roomchat_sock, username,))
-        t.daemon = True
         t.start()
         multithread += [t]
 
@@ -379,7 +412,6 @@ def do_Join():
         # p.start()
         # multiproc += [p]
         t = server_thread(msg_check_mem)
-        t.daemon = True
         t.start()
         multithread += [t]
         # print('[Info] out of server thread')
@@ -391,6 +423,9 @@ def do_Join():
             forward_link(gList, myHashID, sock_peers, roomname,
                          username, myip, myport, msgID, MsgWin, my_tcp_conns)
 
+        t = client_thread()
+        t.start()
+        multithread += [t]
         # update my TCP client when a relevant user terminates
         # (when the user that you CONNECT to terminates, you need to connect to another TCP server instead)
         # TODO: for the following process, I need to reuse `msgID` and `my_tcp_conns`
@@ -400,7 +435,6 @@ def do_Join():
         # p.start()
         # multiproc += [p]
         t = forwardlink_thread(msg_check_mem, myHashID, msgID)
-        t.daemon = True
         t.start()
         multithread += [t]
 
@@ -503,7 +537,7 @@ def do_Poke():
               (membermsg[idx + 1], int(membermsg[idx + 2])), flush=False)
 
         my_udp_socket.sendto(str.encode(msg), (membermsg[idx + 1], int(membermsg[idx + 2])))
-        my_udp_socket.settimeout(2)
+        my_udp_socket.settimeout(2);
 
         try:
             rmsg = my_udp_socket.recvfrom(1000)  # .decode("utf-8")
@@ -523,6 +557,8 @@ def do_Poke():
 def do_Quit():
     global my_tcp_server, my_tcp_conns, thread_end
     CmdWin.insert(1.0, "\nPress Quit")
+    roomchat_sock.close()
+    print("[Info] Closed socket")
 
     if my_tcp_server is not None:
         my_tcp_server.close()
@@ -540,29 +576,17 @@ def do_Quit():
     thread_end = True
     # for t in multithread:
     # 	t.raise_exception()
-    multithread_dict = {t.name: t for t in multithread}
-    show_time("[Info] multithread_dict:{}".format(multithread_dict))
 
-    for t_name in list(sorted(multithread_dict.keys())):
-        t = multithread_dict[t_name]
-        show_time("[----Info] {name} has joined".format(name=t.name))
-        if t_name == 'keep alive thread':
-            t.waiter.set()
-        elif 'forwardlink thread':
-            thread_event.set()
+    for t in multithread:
         t.raise_exception()
         t.join()
-        show_time("[++++Info] {name} has joined".format(name=t.name))
-    show_time("[Info] Closed multithreading")
-
-    # last to close roomchat_sock because server_thread requires roomchat_sock
-    roomchat_sock.close()
-    print("[Info] Closed socket")
+        print("[Info] {name} has joined".format(name=t.name))
+    print("[Info] Closed multithreading")
 
     sys.exit(0)
 
 
-def build_tcp_server(msg_check_mem, waiter):
+def build_tcp_server(msg_check_mem):
     global myip, myport, roomchat_sock, backwardlink, MsgWin, CmdWin, HID_msgID_dict
     # Step 1. create socket and bind
     sockfd = socket.socket()
@@ -582,6 +606,7 @@ def build_tcp_server(msg_check_mem, waiter):
 
     # add the listening socket to the READ socket list
 
+
     while not thread_end:
         RList = [sockfd, udp]
         # create an empty WRITE socket list
@@ -592,8 +617,7 @@ def build_tcp_server(msg_check_mem, waiter):
         # use select to wait for any incoming connection requests or
         # incoming messages or 10 seconds
         try:
-            # Rready, Wready, Eready = select.select(RList, [], [], 10)
-            Rready, Wready, Eready = select.select(RList, [], [], 1)
+            Rready, Wready, Eready = select.select(RList, [], [], 10)
         except select.error as emsg:
             print("At select, caught an exception:", emsg)
             sys.exit(1)
@@ -682,6 +706,7 @@ def build_tcp_server(msg_check_mem, waiter):
                         # print('I am in tcp chatting', sd)
                         rmsg = sd.recv(1000)
                         if rmsg:
+                            print('[Debug] receive and send from server side')
                             receive_and_send(rmsg, sd)
                     #     else:
                     #         print("A client connection is broken!!")
@@ -695,10 +720,10 @@ def build_tcp_server(msg_check_mem, waiter):
 
 def retain_forward_link(msg_check_mem, myHashID, msgID):
     global my_tcp_conns, roomname, username, myip, myport, MsgWin, roomchat_sock, sock_peers, \
-        forwardlink, backwardlink
+        forwardlink, backwardlink, HID_msgID_dict
     # get current member list
     rmsg_mem = query(msg_check_mem, roomchat_sock)
-    roomhash = rmsg_mem.split(':')[1]  # rmsg_mem[0]
+    roomhash = rmsg_mem.split(':')[1] #rmsg_mem[0]
 
     retain_num = 0
 
@@ -712,11 +737,11 @@ def retain_forward_link(msg_check_mem, myHashID, msgID):
             continue
 
         # if the roomhash is changed, update the member list
-        if roomhash != rmsg_mem.split(':')[1]:  # rmsg_mem[0]:
+        if roomhash != rmsg_mem.split(':')[1]: #rmsg_mem[0]:
             retain_num += 1
             print("[P2P >retain_forw] retain_num: {}".format(retain_num))
 
-            roomhash = rmsg_mem.split(':')[1]  # rmsg_mem[0]
+            roomhash = rmsg_mem.split(':')[1] #rmsg_mem[0]
             try:
                 mems = parse_members(rmsg_mem)
             except AssertionError:
@@ -727,6 +752,7 @@ def retain_forward_link(msg_check_mem, myHashID, msgID):
             mem_hashes = set(mem.HashID for mem in mems)
             print("[P2P >retain] backwardlink RIGHT BEFORE update: {}".format(backwardlink))
             backwardlink = {k: v for k, v in backwardlink.items() if k in mem_hashes}
+
             print("[P2P >retain] backwardlink RIGHT AFTER update: {}".format(backwardlink))
 
             # if the my forward server is no longer in the member list,
@@ -738,7 +764,10 @@ def retain_forward_link(msg_check_mem, myHashID, msgID):
                                                                             my_tcp_conns)
             print("[P2P >retain] forwardlink RIGHT AFTER update: {}".format(forwardlink))
 
-        thread_event.wait(timeout=1)
+            # update HID_msgID_dict with mem_hashes
+            HID_msgID_dict = {k: v for k, v in HID_msgID_dict.items() if k in mem_hashes}
+
+        time.sleep(1)
 
 
 def forward_link(gList, myHashID, sock_peers_TODO,
@@ -770,7 +799,6 @@ def forward_link(gList, myHashID, sock_peers_TODO,
     while gList[start].HashID != myHashID:
         print("[loop gList] start:", start)
 
-        # if gList[start].HashID in sock_peers['backward']:
         if gList[start].HashID in backwardlink:
             start = (start + 1) % len(gList)
         else:
@@ -781,10 +809,7 @@ def forward_link(gList, myHashID, sock_peers_TODO,
             #     pdb.set_trace()
 
             if forwardlink != False:
-                t = client_thread()
-                t.daemon = True
-                t.start()
-                multithread += [t]
+
                 print("[P2P >forward_link] out of client thread")
                 # handshake
                 msg = 'P:{roomname}:{username}:{userIP}:{port}:{msgID}::\r\n'. \
@@ -801,6 +826,10 @@ def forward_link(gList, myHashID, sock_peers_TODO,
                     my_tcp_conns += [forwardlink]
                     # backwardlink += [forwardlink]
                     print("[P2P >forward_link] sock_peers['forward']:", gList[start].name)
+
+                    # t = client_thread()
+                    # t.start()
+                    # multithread += [t]
                     break
                 elif rmsg.startswith('F:not_member_msg::\r\n'):
                     forwardlink.close()
@@ -810,8 +839,14 @@ def forward_link(gList, myHashID, sock_peers_TODO,
                 start = (start + 1) % len(gList)
     return sock_peers, msgID, my_tcp_conns, forwardlink
 
+def do_Debug():
+    print('[Debug] this is the forward link', forwardlink)
 
-# manager = multiprocessing.Manager()
+    for bw in backwardlink:
+        print('[Debug] this is the backward links', backwardlink[bw].getpeername())
+    if not backwardlink:
+        print('[Debug] I do not have backward links')
+# manager = mul\tiprocessing.Manager()
 #
 # Set up of Basic UI
 #
@@ -852,6 +887,9 @@ Butt06.pack(side=LEFT, padx=8, pady=8)
 Butt05 = Button(topmidframe, width='6', relief=RAISED,
                 text="Quit", command=do_Quit)
 Butt05.pack(side=LEFT, padx=8, pady=8)
+Butt07 = Button(topmidframe, width='6', relief=RAISED,
+                text="Debug", command=do_Debug)
+Butt07.pack(side=LEFT, padx=8, pady=8)
 
 # Lower Middle Frame for User input
 lowmidframe = Frame(win, relief=RAISED, borderwidth=1)

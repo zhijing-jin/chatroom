@@ -157,37 +157,6 @@ def asy():
     loop.close()
 
 
-def multithread():
-    import threading
-    e = threading.Event()
-    show_time("Start waiting")
-
-    e.wait(timeout=10)
-    show_time("Ended waiting")
-
-    return
-
-    class SummingThread(threading.Thread):
-        def __init__(self, low, high):
-            super(SummingThread, self).__init__()
-            self.low = low
-            self.high = high
-            self.total = 0
-
-        def run(self):
-            for i in range(self.low, self.high):
-                self.total += i
-
-    thread1 = SummingThread(0, 500000)
-    thread2 = SummingThread(500000, 1000000)
-    thread1.start()  # This actually causes the thread to run
-    thread2.start()
-    thread1.join()  # This waits until the thread has completed
-    thread2.join()
-    # At this point, both threads have completed
-    result = thread1.total + thread2.total
-    print (result)
-
 if __name__ == "__main__":
     # multiproc()
     '''
@@ -196,4 +165,4 @@ if __name__ == "__main__":
     print("[info] out of mproc")
     print("[info] res")
     '''
-    multithread()
+    asy2()
