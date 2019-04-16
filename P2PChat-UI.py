@@ -50,6 +50,7 @@ msgID = 0
 HID_msgID_dict = {}
 read_lock_HID_msgID_dict = threading.Lock()
 sem_lock_HID_msgID_dict = threading.Lock()
+write_lock_HID_msgID_dict = threading.Lock()
 readcount_HID_msgID_dict = 0
 
 sock_peers = {'backward': [],
@@ -173,7 +174,7 @@ class client_thread(working_threads):
                 # use select to wait for any incoming connection requests or
                 # incoming messages or 10 seconds
                 try:
-                    Rready, Wready, Eready = select.select(RList, [], [], 10)
+                    Rready, Wready, Eready = select.select(RList, [], [], 1)
                 except select.error as emsg:
                     print("At select, caught an exception:", emsg)
                     sys.exit(1)
@@ -630,7 +631,7 @@ def build_tcp_server(msg_check_mem):
         # use select to wait for any incoming connection requests or
         # incoming messages or 10 seconds
         try:
-            Rready, Wready, Eready = select.select(RList, [], [], 10)
+            Rready, Wready, Eready = select.select(RList, [], [], 1)
         except select.error as emsg:
             print("At select, caught an exception:", emsg)
             sys.exit(1)
@@ -693,6 +694,7 @@ def build_tcp_server(msg_check_mem):
                         gList = parse_members(rmsg_mems)
                         mem_hashes = set(mem.HashID for mem in gList)
                         HID_msgID_dict[str(client_hash)] = msgID
+                        print('[Debug] I set {} to {}'.format(rmsg[1], msgID))
 
                         if not client_hash in mem_hashes:
                             print("[Error] Detected non-member connection. Closing.")
