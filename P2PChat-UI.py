@@ -22,11 +22,23 @@ from interaction import query, parse_name, parse_rmsg, handle_join_rmsg, \
     parse_memberships, parse_members, parse_send_message
 
 from time import sleep
+'''
+Overall structure of the code file:
 
+Part 1. Global variables
+
+Part 2. Threads and usage functions
+
+Part 3. Functions to handle user input
+
+Part 4. Set up of Basic UI
+'''
 #
-# Global variables
+# Part 1. Global variables
 #
 show_time("[P2P] start program")
+
+# Following are the ip addresses and ports
 roomchat_ip = sys.argv[1]
 roomchat_ip = '127.0.0.1' if roomchat_ip == 'localhost' else roomchat_ip
 
@@ -39,22 +51,24 @@ mysock = None
 username = ""
 roomname = ""
 
+# Following are the variables for msgID
 msgID = 0
-# this will include myself, so that when my message is sent back to me, I know not to resend it
-# HID as str, msgID as int
-HID_msgID_dict = {}
+HID_msgID_dict = {}  # this will include myself, so that when my message is sent back to me, I know not to resend it. HID as str, msgID as int
 read_lock_HID_msgID_dict = threading.Lock()
 sem_lock_HID_msgID_dict = threading.Lock()
 write_lock_HID_msgID_dict = threading.Lock()
 readcount_HID_msgID_dict = 0
 
-sock_peers = {'backward': [],
-              'forward': None}  # backward holds a list of hasIDs [hashID], forward holds hashID where this p2p is pointing at
+# Following are the variables for TCP server, client and UDP socket
 my_tcp_server = None
 my_tcp_conns = []
 my_udp_socket = None
+sock_peers = {'backward': [],
+              'forward': None}  # backward holds a list of hasIDs [hashID], forward holds hashID where this p2p is pointing at
 backwardlink = {}  # backward links {"hash": conn}
 forwardlink = None  # forward links
+
+# Following are the variables for multithreading
 multiproc = []  # a global list to manage the multi processing
 multithread = []  # a global list to manage the multithread work
 thread_end = False
@@ -307,6 +321,7 @@ def do_User():
         CmdWin.insert(1.0,
                       "\n[Warn] You cannot change username because you have [Join]'ed. Your current name: {}".format(
                           username))
+        userentry.delete(0, END)
         return
     name = parse_name(userentry)
     if not name:
@@ -450,10 +465,10 @@ def do_Send():
 
     if forwardlink:
         forwardlink.send(str.encode(msg))
-        CmdWin.insert(1.0,"\n[Send] Reley the message to other peer")
-    for bwl in list(backwardlink.values()):
+        CmdWin.insert(1.0,"\n[Send] Reley the message to other peer (forward)")
+    for bwl_ix, bwl in enumerate(list(backwardlink.values())):
         bwl.send(str.encode(msg))
-        CmdWin.insert(1.0,"\n[Send] Reley the message to other peer")
+        CmdWin.insert(1.0,"\n[Send] Reley the message to other peer (backward{})".format(bwl_ix))
     userentry.delete(0, END)
 
 
