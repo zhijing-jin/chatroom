@@ -128,7 +128,7 @@ class keepalive_thread(working_threads):
     def run(self):
         try:
             while not thread_end:
-                thread_event.wait(self.interval)
+                time.sleep(self.interval)
                 print('[P2P >keepalive] {} greetings from {} with thread {}'.format(show_time(), self.txt, self.name))
 
                 rmsg = query(self.msg, self.sockfd)
@@ -232,7 +232,7 @@ def receive_and_send(rmsg, sending_sock):
         if origin_roomname != roomname:
             print('this is not my room')
             return
-            
+
         if originHID in HID_msgID_dict:
             print('I know this guy, last msgid {} this msgid {}'.format(HID_msgID_dict[originHID], msgID))
         else:
@@ -242,29 +242,31 @@ def receive_and_send(rmsg, sending_sock):
             err('we have recorded this message')
             return
 
-        if not originHID in HID_msgID_dict:
-            # handle the case that this is an unknown peer
-            print("[Info] I don't know this guy, add it to my dict")
-            msg_check_mem = 'J:{roomname}:{username}:{userIP}:{port}::\r\n'. \
-                format(roomname=roomname, username=username,
-                       userIP=myip, port=myport)
-            try:
-                newmsg = query(msg_check_mem, roomchat_sock)
-                membermsg = parse_memberships(newmsg)
-                memberships = membermsg[1::3]
-            except:
-                err('Fail to ask roomserver about the unknown sender')
-            if not newmsg or newmsg[0] == 'F':
-                err('Fail to ask roomserver about the unknown sender')
-                return
+        with write_lock_HID_msgID_dict:
+            if not originHID in HID_msgID_dict:
 
-            try:
-                # if cannot find him in the group list, report an error
-                idx = memberships.index(origin_username)
-            except:
-                err('Fail to find sender: {} in this chatroom'.format(origin_username))
-                return
-            print("[Info] upon asking for this unknown, I get", newmsg)
+                # handle the case that this is an unknown peer
+                print("[Info] I don't know this guy, add it to my dict")
+                msg_check_mem = 'J:{roomname}:{username}:{userIP}:{port}::\r\n'. \
+                    format(roomname=roomname, username=username,
+                           userIP=myip, port=myport)
+                try:
+                    newmsg = query(msg_check_mem, roomchat_sock)
+                    membermsg = parse_memberships(newmsg)
+                    memberships = membermsg[1::3]
+                except:
+                    err('Fail to ask roomserver about the unknown sender')
+                if not newmsg or newmsg[0] == 'F':
+                    err('Fail to ask roomserver about the unknown sender')
+                    return
+
+                try:
+                    # if cannot find him in the group list, report an error
+                    idx = memberships.index(origin_username)
+                except:
+                    err('Fail to find sender: {} in this chatroom'.format(origin_username))
+                    return
+                print("[Info] upon asking for this unknown, I get", newmsg)
 
         HID_msgID_dict[originHID] = int(msgID)
         MsgWin.insert(1.0, "\n[{origin_username}] [ID: {msgID}]: {content}".format(origin_username=origin_username,
@@ -578,7 +580,6 @@ def do_Quit():
     # sys.exit(0)
 
     thread_end = True
-    thread_event.set()
     # for t in multithread:
     # 	t.raise_exception()
     multithread_dict = {t.name: t for t in multithread}
@@ -782,7 +783,7 @@ def retain_forward_link(msg_check_mem, myHashID, msgID):
             # update HID_msgID_dict with mem_hashes
             HID_msgID_dict = {k: v for k, v in HID_msgID_dict.items() if k in mem_hashes}
 
-        thread_event.wait(1)
+        time.sleep(1)
 
 
 def forward_link(gList, myHashID, sock_peers_TODO,
@@ -855,16 +856,12 @@ def forward_link(gList, myHashID, sock_peers_TODO,
     return sock_peers, msgID, my_tcp_conns, forwardlink
 
 def do_Debug():
-    f_link_name = str(forwardlink).split('laddr=')[-1] if forwardlink else forwardlink
-    print('[Debug] forward_link: {}'.format(f_link_name))
+    print('[Debug] this is the forward link', forwardlink)
 
-    MsgWin.insert(1.0, '\n[Debug] forward_link: {}'.format(f_link_name) )
-
-    b_link_names = [str(backwardlink[bw].getpeername()[-1]) for bw in backwardlink]
-    b_link_names = ', '.join(b_link_names)
-    print('[Debug] backward_links: ' + b_link_names)
-
-    MsgWin.insert(1.0, '\n[Debug] backward_links: ' + b_link_names)
+    for bw in backwardlink:
+        print('[Debug] this is the backward links', backwardlink[bw].getpeername())
+    if not backwardlink:
+        print('[Debug] I do not have backward links')
 # manager = mul\tiprocessing.Manager()
 #
 # Set up of Basic UI
