@@ -62,6 +62,7 @@ forwardlink = None  # forward links
 multiproc = []  # a global list to manage the multi processing
 multithread = []  # a global list to manage the multithread work
 thread_end = False
+thread_event = threading.Event()
 
 ''' this is a super class for all the thread objects '''
 
@@ -148,6 +149,9 @@ class server_thread(working_threads):
 
 
 class client_thread(working_threads):
+    '''
+    only related to do_Send
+    '''
     def __init__(self, name='client thread'):
         working_threads.__init__(self)
         self.name = name
@@ -159,6 +163,7 @@ class client_thread(working_threads):
 
             while not thread_end:
                 if not forwardlink:
+                    thread_event.wait(0.5) # not making this check too frequent and delay other threads
                     continue
                 RList = [forwardlink]
                 # create an empty WRITE socket list
