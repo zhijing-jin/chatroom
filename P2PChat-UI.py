@@ -1,10 +1,10 @@
 #!/usr/bin/python3
 
-# Student name and No.:
-# Student name and No.:
-# Development platform:
-# Python version:
-# Version:
+# Student name and No.: JIN Zhijing 3035235355
+# Student name and No.: CHEN Zihao  3035232640
+# Development platform: Mac OS
+# Python version: Python 3.6.7
+# Version: 3.0
 
 
 from tkinter import *
@@ -383,7 +383,7 @@ def do_Join():
         else:
             CmdWin.insert(1.0, "\n[Error] Already in a room. Cannot change rooms.")
     else:
-#         CmdWin.insert(1.0, "\n[Error] Already in a room. Cannot change rooms.".format(roomchat_sock.getsockname()))
+#         CmdWin.insert(1.0, "\n[Info] Your client socket: {}".format(roomchat_sock.getsockname()))
 
         roomname = name
         # Step 1. join the chatroom, by sending msg to chatroom app

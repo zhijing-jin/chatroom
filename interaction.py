@@ -65,8 +65,15 @@ def parse_send_message(msg_str, prefix="T:", suffix="::\r\n"):
 
 def handle_join_rmsg(rmsg, roomname, CmdWin, MsgWin):
     if rmsg[0] != 'F':
-        outstr = "\n[Join] roomname: " + roomname
+        gList = parse_members(rmsg)
+        gList = sorted(gList, key=lambda x: x.name)
+        mem_list = ["\t- Name: {} (IP: {}, port: {})".format(mem.name, mem.ip, mem.port) for mem in gList]
+        mem_list = '\n'.join(mem_list)
+
+        outstr = "\n[Join]\tRoomname: {}\n\tRoom members are as follows:".format(roomname)
+        outstr += "\n" + mem_list
         CmdWin.insert(1.0, outstr)
+
     elif rmsg.startswith('F:JOIN message - Already joined another chatroom!!:'):
         outstr = "\n[Join] Error - Request rejected: Already joined another chatroom!!"
         CmdWin.insert(1.0, outstr)
