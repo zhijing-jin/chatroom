@@ -215,17 +215,16 @@ def receive_and_send(rmsg, sending_sock):
 
         if originHID in HID_msgID_dict:
             print('I know this guy, last msgid {} this msgid {}'.format(HID_msgID_dict[originHID], msgID))
-        else:
-            print('I do not know this guy')
-
-        if originHID in HID_msgID_dict and int(HID_msgID_dict[originHID]) >= int(msgID):
-            err('we have recorded this message')
-            return
 
         with write_lock_HID_msgID_dict:
+            if originHID in HID_msgID_dict and int(HID_msgID_dict[originHID]) >= int(msgID):
+                err('we have recorded this message')
+                return
+
+        # with write_lock_HID_msgID_dict:
             if not originHID in HID_msgID_dict:
                 # handle the case that this is an unknown peer
-                print("[Info] I don't know this guy, add it to my dict")
+                print("[Info] I don't know this guy, add it to my dict", originHID, msgID, HID_msgID_dict)
                 msg_check_mem = 'J:{roomname}:{username}:{userIP}:{port}::\r\n'. \
                     format(roomname=roomname, username=username,
                            userIP=myip, port=myport)
@@ -245,11 +244,10 @@ def receive_and_send(rmsg, sending_sock):
                 except:
                     err('Fail to find sender: {} in this chatroom'.format(origin_username))
                     return
-                print("[Info] upon asking for this unknown, I get", newmsg)
 
-        HID_msgID_dict[originHID] = int(msgID)
-        MsgWin.insert(1.0, "\n[{origin_username}] [ID: {msgID}]: {content}".format(origin_username=origin_username,
-                                                                                   msgID=msgID, content=content))
+            HID_msgID_dict[originHID] = int(msgID)
+            MsgWin.insert(1.0, "\n[{origin_username}] [ID: {msgID}]: {content}".format(origin_username=origin_username,
+                                                                                       msgID=msgID, content=content))
 
         if forwardlink:
             forwardlink.send(rmsg)
@@ -339,9 +337,7 @@ def do_List():
     else:
         for group in groups:
             CmdWin.insert(1.0, "\n    {}".format(group))
-        CmdWin.insert(1.0, "\n[List] Here are the active chatrooms:")
 
-    MsgWin.insert(1.0, "\nThe received message: {}".format(rmsg))
 
 
 def do_Join():
@@ -463,9 +459,10 @@ def do_Send():
 
     if forwardlink:
         forwardlink.send(str.encode(msg))
+        CmdWin.insert(1.0,"\n[Send] Reley the message to other peer")
     for bwl in list(backwardlink.values()):
-        print('I send via', bwl)
         bwl.send(str.encode(msg))
+        CmdWin.insert(1.0,"\n[Send] Reley the message to other peer")
     userentry.delete(0, END)
 
 
@@ -519,11 +516,12 @@ def do_Poke():
         if not my_udp_socket:
             my_udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         msg = 'K:{roomname}:{username}::\r\n'.format(roomname=roomname, username=username)
-        MsgWin.insert(1.0, "\n The message you are sending is " + msg)
+
 
         print("index of ", targetname, " is ", str.encode(msg),
               (membermsg[idx + 1], int(membermsg[idx + 2])), flush=False)
 
+        CmdWin.insert(1.0,"\n[Poke] Have sent a poke to {}".format(targetname))
         my_udp_socket.sendto(str.encode(msg), (membermsg[idx + 1], int(membermsg[idx + 2])))
         my_udp_socket.settimeout(2)
 
@@ -537,7 +535,7 @@ def do_Poke():
             CmdWin.insert(1.0, "\n[Error] Poke failure")
         elif "A::\r\n" == rmsg[0].decode("utf-8"):
             print("success", flush=False)
-            CmdWin.insert(1.0, "\n[Poke] You poked {}".format(targetname))
+            CmdWin.insert(1.0, "\n[Poke] Received ACK from {}".format(targetname))
         else:
             CmdWin.insert(1.0, "\n[Error] Poke failure")
 
@@ -581,13 +579,13 @@ def do_Debug():
     f_link_name = str(forwardlink).split('laddr=')[-1] if forwardlink else forwardlink
     print('[Debug] {} forward_link: {}'.format(show_time(printout=False), f_link_name))
 
-    MsgWin.insert(1.0, '\n[Debug] {} forward_link: {}'.format(show_time(printout=False), f_link_name))
+    CmdWin.insert(1.0, '\n[Debug] {} forward_link: {}'.format(show_time(printout=False), f_link_name))
 
     b_link_names = [str(backwardlink[bw].getpeername()[-1]) for bw in backwardlink]
     b_link_names = ', '.join(b_link_names)
     print('[Debug] {} backward_links: {}'.format(show_time(printout=False), b_link_names))
 
-    MsgWin.insert(1.0, '\n[Debug] {} backward_links: {}'.format(show_time(printout=False), b_link_names))
+    CmdWin.insert(1.0, '\n[Debug] {} backward_links: {}'.format(show_time(printout=False), b_link_names))
 
 
 def build_tcp_server(msg_check_mem):
@@ -643,9 +641,8 @@ def build_tcp_server(msg_check_mem):
                     else:
                         print(msg, addr, flush=False)
                         rmsg = parse_rmsg(msg.decode("utf-8"), prefix="K:", suffix="::\r\n")
-                        MsgWin.insert(1.0, "\n~~~~~~~~~~~~~{}~~~~~~~~~~~~~~".format(rmsg[1]))
-
-                        print("You are poked by {}!!".format(rmsg[1]))
+                        MsgWin.insert(1.0, "\n~~~~~~~~~~~~~[{}]Poke~~~~~~~~~~~~~~".format(rmsg[1]))
+                        CmdWin.insert(1.0, "\nReceived a poke from {}".format(rmsg[1]))
                         sd.sendto(str.encode("A::\r\n"), addr)
                 elif sd == sockfd:
                     print('I am in tcp establishing')
@@ -815,7 +812,7 @@ def forward_link(gList, myHashID, sock_peers_TODO,
                 msg = 'P:{roomname}:{username}:{userIP}:{port}:{msgID}::\r\n'. \
                     format(roomname=roomname, username=username,
                            userIP=myip, port=myport, msgID=msgID)
-                MsgWin.insert(1.0, "\n[JOIN] peer-to-peer handshake sent msg: {}".format(msg))
+                # MsgWin.insert(1.0, "\n[JOIN] peer-to-peer handshake sent msg: {}".format(msg))
                 rmsg = query(msg, forwardlink)
                 if rmsg.startswith('S:'):
                     sock_peers['forward'] = gList[start].HashID

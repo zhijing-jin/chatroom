@@ -82,7 +82,6 @@ def handle_join_rmsg(rmsg, roomname, CmdWin, MsgWin):
     elif rmsg.startswith('F:JOIN message - Already joined another chatroom!!:'):
         outstr = "\n[Join] Error - Request rejected: Already joined another chatroom!!"
         CmdWin.insert(1.0, outstr)
-    MsgWin.insert(1.0, "\n[Join] received msg: {}".format(rmsg))
 
 
 def parse_members(msg_str, prefix="M:", suffix="::\r\n"):
