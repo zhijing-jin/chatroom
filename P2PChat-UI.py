@@ -10,18 +10,13 @@
 from tkinter import *
 import sys
 import socket
-import datetime
-import sched
-import multiprocessing
-from multiprocessing import Process
 import select
 import threading
-import time
 import ctypes
 
 sys.path.append('.')
 
-from utils import sdbm_hash, show_time
+from utils import sdbm_hash, show_time, err
 from build_socket import build_tcp_client  # forward_link # retain_forward_link # build_tcp_server,
 from interaction import query, parse_name, parse_rmsg, handle_join_rmsg, \
     parse_memberships, parse_members, parse_send_message
@@ -185,10 +180,6 @@ class client_thread(working_threads):
 
         finally:
             print("{} internally ended".format(self.name))
-
-
-def err(msg='We encounter an error'):
-    print('[Error] {}'.format(msg))
 
 
 def receive_and_send(rmsg, sending_sock):
