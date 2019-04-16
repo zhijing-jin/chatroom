@@ -128,7 +128,7 @@ class keepalive_thread(working_threads):
     def run(self):
         try:
             while not thread_end:
-                time.sleep(self.interval)
+                thread_event.wait(self.interval)
                 print('[P2P >keepalive] {} greetings from {} with thread {}'.format(show_time(), self.txt, self.name))
 
                 rmsg = query(self.msg, self.sockfd)
@@ -580,6 +580,7 @@ def do_Quit():
     # sys.exit(0)
 
     thread_end = True
+    thread_event.set()
     # for t in multithread:
     # 	t.raise_exception()
     multithread_dict = {t.name: t for t in multithread}
@@ -783,7 +784,7 @@ def retain_forward_link(msg_check_mem, myHashID, msgID):
             # update HID_msgID_dict with mem_hashes
             HID_msgID_dict = {k: v for k, v in HID_msgID_dict.items() if k in mem_hashes}
 
-        time.sleep(1)
+        thread_event.wait(1)
 
 
 def forward_link(gList, myHashID, sock_peers_TODO,
@@ -856,12 +857,16 @@ def forward_link(gList, myHashID, sock_peers_TODO,
     return sock_peers, msgID, my_tcp_conns, forwardlink
 
 def do_Debug():
-    print('[Debug] this is the forward link', forwardlink)
+    f_link_name = str(forwardlink).split('laddr=')[-1] if forwardlink else forwardlink
+    print('[Debug] forward_link: {}'.format(f_link_name))
 
-    for bw in backwardlink:
-        print('[Debug] this is the backward links', backwardlink[bw].getpeername())
-    if not backwardlink:
-        print('[Debug] I do not have backward links')
+    MsgWin.insert(1.0, '\n[Debug] forward_link: {}'.format(f_link_name) )
+
+    b_link_names = [str(backwardlink[bw].getpeername()[-1]) for bw in backwardlink]
+    b_link_names = ', '.join(b_link_names)
+    print('[Debug] backward_links: ' + b_link_names)
+
+    MsgWin.insert(1.0, '\n[Debug] backward_links: ' + b_link_names)
 # manager = mul\tiprocessing.Manager()
 #
 # Set up of Basic UI
