@@ -2,6 +2,9 @@
 
 ## News (15 Apr)
 - Bug1: Sometimes the 1st message by `do_Send()` is duplicated.
+- poke cannot be successful
+- do_Join's backward,forward has problems
+- need to lock `query`
 - Bug2: `do_Quit()`: only need to paraphrase `Rready, Wready, Eready = select.select(RList, [], [], 10)`
 
 
