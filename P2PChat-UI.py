@@ -272,10 +272,10 @@ def receive_and_send(rmsg, sending_sock):
 
         if forwardlink:
             forwardlink.send(rmsg)
-            MsgWin.insert(1.0, '\n[Debug] I am sending to', forwardlink)
+            print('[Debug] I am sending to', forwardlink)
         for sk in backwardlink:
             if backwardlink[sk] != sending_sock:
-                MsgWin.insert(1.0, '\n[Debug] I am sending to', backwardlink[sk].getpeername())
+                print('[Debug] I am sending to', backwardlink[sk].getpeername())
                 backwardlink[sk].send(rmsg)
 
     else:
