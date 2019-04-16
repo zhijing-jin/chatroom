@@ -1,5 +1,6 @@
 
-
+def err(msg='We encounter an error'):
+    print('[Error] {}'.format(msg))
 
 def sdbm_hash(instr):
     #

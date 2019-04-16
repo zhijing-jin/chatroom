@@ -10,28 +10,34 @@
 from tkinter import *
 import sys
 import socket
-import datetime
-import sched
-import multiprocessing
-from multiprocessing import Process
 import select
 import threading
-import time
 import ctypes
 
 sys.path.append('.')
 
-from utils import sdbm_hash, show_time
+from utils import sdbm_hash, show_time, err
 from build_socket import build_tcp_client  # forward_link # retain_forward_link # build_tcp_server,
 from interaction import query, parse_name, parse_rmsg, handle_join_rmsg, \
     parse_memberships, parse_members, parse_send_message
 
-from time import sleep
+'''
+Overall structure of the code file:
 
+Part 1. Global variables
+
+Part 2. Threads and usage functions
+
+Part 3. Functions to handle user input
+
+Part 4. Set up of Basic UI
+'''
 #
-# Global variables
+# Part 1. Global variables
 #
 show_time("[P2P] start program")
+
+# Following are the ip addresses and ports
 roomchat_ip = sys.argv[1]
 roomchat_ip = '127.0.0.1' if roomchat_ip == 'localhost' else roomchat_ip
 
@@ -44,21 +50,22 @@ mysock = None
 username = ""
 roomname = ""
 
+# Following are the variables for msgID
 msgID = 0
-# this will include myself, so that when my message is sent back to me, I know not to resend it
-# HID as str, msgID as int
-HID_msgID_dict = {}
+HID_msgID_dict = {}  # this will include myself, so that when my message is sent back to me, I know not to resend it. HID as str, msgID as int
 read_lock_HID_msgID_dict = threading.Lock()
 sem_lock_HID_msgID_dict = threading.Lock()
 write_lock_HID_msgID_dict = threading.Lock()
 readcount_HID_msgID_dict = 0
 
-sock_peers = {'backward': [],
-              'forward': None}  # backward holds a list of hasIDs [hashID], forward holds hashID where this p2p is pointing at
+<<<<<<< HEAD
+# Following are the variables for TCP server, client and UDP socket
 my_tcp_server = None # response to send msg and build new connection
 my_udp_server = None # repsonse to poke with ACK
 my_udp_client = None # sending poke
-my_tcp_conns = [] # all the connections that need to close at the end
+sock_peers = {'backward': [],
+              'forward': None}  # backward holds a list of hasIDs [hashID], forward holds hashID where this p2p is pointing at
+
 backwardlink = {}  # backward links {"hash": conn}
 forwardlink = None  # forward links
 multithread = []  # a global list to manage the multithread work
@@ -71,6 +78,9 @@ thread_event = threading.Event()
 use_debug_botton = False
 
 
+#
+# Part 2. Threads and usage functions
+#
 class working_threads(threading.Thread):
     ''' this is a super class for all the thread objects '''
 
@@ -99,6 +109,10 @@ class working_threads(threading.Thread):
 
 
 class keepalive_thread(working_threads):
+    '''
+    this is a thread to keep the program alive by sending a JOIN request every 20 sec
+    '''
+
     def __init__(self, msg, sockfd, txt='', interval=20, name='keep alive thread'):
         working_threads.__init__(self)
         self.name = name
@@ -119,6 +133,10 @@ class keepalive_thread(working_threads):
 
 
 class server_thread(working_threads):
+    '''
+    This is a thread to run a TCP server
+    '''
+
     def __init__(self, msg, name='server thread'):
         working_threads.__init__(self)
         self.msg = msg
@@ -133,7 +151,7 @@ class server_thread(working_threads):
 
 class client_thread(working_threads):
     '''
-    only related to do_Send
+    This is a thread to establish a client. only related to do_Send
     '''
 
     def __init__(self, name='client thread'):
@@ -185,10 +203,6 @@ class client_thread(working_threads):
 
         finally:
             print("{} internally ended".format(self.name))
-
-
-def err(msg='We encounter an error'):
-    print('[Error] {}'.format(msg))
 
 
 def receive_and_send(rmsg, sending_sock):
@@ -279,10 +293,6 @@ class forwardlink_thread(working_threads):
             print("{} internally ended".format(self.name))
 
 
-#
-# Functions to handle user input
-#
-
 def check_join():
     '''
     this function checks whether the client has joined in  or not
@@ -310,12 +320,18 @@ def check_join():
         return True
 
 
+#
+# Part 3. Functions to handle user input
+#
+
+
 def do_User():
     global username
     if check_join():
         CmdWin.insert(1.0,
                       "\n[Warn] You cannot change username because you have [Join]'ed. Your current name: {}".format(
                           username))
+        userentry.delete(0, END)
         return
     name = parse_name(userentry)
     if not name:
@@ -346,11 +362,11 @@ def do_Join():
         my_tcp_conns, forwardlink, multithread
     name = parse_name(userentry)
 
-    if not username:
+    if not username: # if username has not been set before, show error
         CmdWin.insert(1.0, "\n[Error] Username cannot be empty. Pls input username and press [User].")
         return
 
-    if not name:
+    if not name: # if inputted roomname is empty, show error
         CmdWin.insert(1.0, "\n[Error] roomname cannot be empty.")
     elif check_join():
         if name == roomname:
@@ -371,34 +387,17 @@ def do_Join():
 
         # Step 2. keepalive, by sending JOIN msg to the chatroom app every 20 sec
 
-        # TODO: change to thread
-        # p = Process(target=keepalive, args=(msg_check_mem, roomchat_sock, username,))
-        # p.start()
-        # multiproc += [p]
-        # print('[Info] out of keepalive')
-
         t = keepalive_thread(msg_check_mem, roomchat_sock,
                              username)  # ing.Thread(target=tmp_test, args=(1,)) #target=keepalive, args=(msg_check_mem, roomchat_sock, username,))
         t.start()
         multithread += [t]
 
-        # except:
-        #     print('Unable to use multi threading on keepalive')
-        #     exit(0)
-        # print('[Info] out of keepalive')
-
         myHashID = sdbm_hash("{}{}{}".format(username, myip, myport))
 
         # Step 4. start my TCP server, as the server for other users to CONNECT to in the chatroom
-        # TODO: chagne to thread
-        # p = Process(target=build_tcp_server,
-        # 		args=(msg_check_mem,))
-        # p.start()
-        # multiproc += [p]
         t = server_thread(msg_check_mem)
         t.start()
         multithread += [t]
-        # print('[Info] out of server thread')
 
         # Step 5. start a TCP client, to CONNECT another user's TCP server in the chatroom
         print('[Info] Entering forward link establishment')
@@ -412,18 +411,10 @@ def do_Join():
         multithread += [t]
         # update my TCP client when a relevant user terminates
         # (when the user that you CONNECT to terminates, you need to connect to another TCP server instead)
-        # TODO: for the following process, I need to reuse `msgID` and `my_tcp_conns`
-        # TODO: change to thread
-        # p = Process(target=retain_forward_link,
-        #             args=(msg_check_mem, myHashID, msgID))
-        # p.start()
-        # multiproc += [p]
         t = forwardlink_thread(msg_check_mem, myHashID, msgID)
         t.start()
         multithread += [t]
 
-    # import pdb;
-    # pdb.set_trace()
 
 
 def do_Send():
@@ -459,10 +450,10 @@ def do_Send():
 
     if forwardlink:
         forwardlink.send(str.encode(msg))
-        CmdWin.insert(1.0,"\n[Send] Reley the message to other peer")
-    for bwl in list(backwardlink.values()):
+        CmdWin.insert(1.0,"\n[Send] Reley the message to other peer (forward)")
+    for bwl_ix, bwl in enumerate(list(backwardlink.values())):
         bwl.send(str.encode(msg))
-        CmdWin.insert(1.0,"\n[Send] Reley the message to other peer")
+        CmdWin.insert(1.0,"\n[Send] Reley the message to other peer (backward{})".format(bwl_ix))
     userentry.delete(0, END)
 
 
@@ -850,7 +841,7 @@ def forward_link(gList, myHashID, sock_peers_TODO,
     return sock_peers, msgID, my_tcp_conns, forwardlink
 
 #
-# Set up of Basic UI
+# Part 4. Set up of Basic UI
 #
 win = Tk()
 win.title("MyP2PChat")

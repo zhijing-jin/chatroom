@@ -1,9 +1,6 @@
-import time
 from utils import sdbm_hash, show_time
-from collections import OrderedDict
 from tkinter import END
-import asyncio
-
+import socket
 
 class Member(object):
     def __init__(self, **kwargs):
