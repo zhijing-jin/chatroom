@@ -58,13 +58,14 @@ sem_lock_HID_msgID_dict = threading.Lock()
 write_lock_HID_msgID_dict = threading.Lock()
 readcount_HID_msgID_dict = 0
 
-<<<<<<< HEAD
+
 # Following are the variables for TCP server, client and UDP socket
 my_tcp_server = None # response to send msg and build new connection
 my_udp_server = None # repsonse to poke with ACK
 my_udp_client = None # sending poke
 sock_peers = {'backward': [],
               'forward': None}  # backward holds a list of hasIDs [hashID], forward holds hashID where this p2p is pointing at
+my_tcp_conns = [] # lists of connections
 
 backwardlink = {}  # backward links {"hash": conn}
 forwardlink = None  # forward links
