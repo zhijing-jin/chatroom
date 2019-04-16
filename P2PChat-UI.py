@@ -214,7 +214,7 @@ def receive_and_send(rmsg, sending_sock):
     raw_msg = rmsg.decode("utf-8")
     if not raw_msg.startswith("T:"):
         return
-    msg_split, content = parse_send_message()
+    msg_split, content = parse_send_message(raw_msg)
     print(msg_split, content)
     if msg_split:  # otherwise the msg format is incorrect
         origin_roomname = msg_split[0]
