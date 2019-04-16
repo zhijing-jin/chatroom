@@ -382,7 +382,7 @@ def do_Join():
         else:
             CmdWin.insert(1.0, "\n[Error] Already in a room. Cannot change rooms.")
     else:
-        CmdWin.insert(1.0, "\n[Error] Already in a room. Cannot change rooms.".format(roomchat_sock.getsockname()))
+#         CmdWin.insert(1.0, "\n[Error] Already in a room. Cannot change rooms.".format(roomchat_sock.getsockname()))
 
         roomname = name
         # Step 1. join the chatroom, by sending msg to chatroom app
