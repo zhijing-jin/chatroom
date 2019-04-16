@@ -191,16 +191,15 @@ def err(msg='We encounter an error'):
     print('[Error] {}'.format(msg))
 
 
-'''
-sending_sock is where the message comes from, and therefore not necessary to resend message to him
-'''
-
-
 def receive_and_send(rmsg, sending_sock):
+    '''
+    sending_sock is where the message comes from, and therefore not necessary to resend message to him
+    '''
     global HID_msgID_dict, roomchat_sock
     raw_msg = rmsg.decode("utf-8")
     if not raw_msg.startswith("T:"):
         return
+
     msg_split, content = parse_send_message(raw_msg)
     print(msg_split, content)
     if msg_split:  # otherwise the msg format is incorrect
@@ -286,11 +285,13 @@ class forwardlink_thread(working_threads):
 # Functions to handle user input
 #
 
-# this function checks whether the client has joined in  or not
-# considering possible unstability of network, a local variable may not be sufficient to check join
-# therefore each time need to check join, we send a query, and set roomname to False if failed
-# in this way, if the client accidentally gets kicked from a chatroom, he still can join a chatroom
 def check_join():
+    '''
+    this function checks whether the client has joined in  or not
+    considering possible unstability of network, a local variable may not be sufficient to check join
+    therefore each time need to check join, we send a query, and set roomname to False if failed
+    in this way, if the client accidentally gets kicked from a chatroom, he still can join a chatroom
+    '''
     global roomname
 
     if not roomname:
@@ -341,9 +342,6 @@ def do_List():
         CmdWin.insert(1.0, "\n[List] Here are the active chatrooms:")
 
     MsgWin.insert(1.0, "\nThe received message: {}".format(rmsg))
-
-
-# G:Name1:Name2:Name3::\r\n
 
 
 def do_Join():
@@ -546,42 +544,50 @@ def do_Poke():
 
 def do_Quit():
     global my_tcp_server, my_tcp_conns, thread_end
-    CmdWin.insert(1.0, "\nPress Quit")
+    CmdWin.insert(1.0, "\n[Quit] Quitting now.")
 
+    # Step 1. close the my TCP server and all its connections
     if my_tcp_server is not None:
         my_tcp_server.close()
         for conn in my_tcp_conns:
             conn.close()
         print("[Info] Closed tcp_conn, tcp_server")
 
-    # for p in multiproc:
-    #     p.terminate()
-    #     p.join()
-    # print("[Info] Closed multiprocessing")
-
-    # sys.exit(0)
-
+    # Step 2. end the threads
     thread_end = True
     thread_event.set()
-    # for t in multithread:
-    # 	t.raise_exception()
+
     multithread_dict = {t.name: t for t in multithread}
-    show_time("[Info] multithread_dict:{}".format(multithread_dict))
 
     for t_name in list(sorted(multithread_dict.keys())):
         t = multithread_dict[t_name]
-        show_time("[----Info] {name} has joined".format(name=t.name))
 
+        show_time("[Info] {name} starts quitting".format(name=t.name))
         t.raise_exception()
         t.join()
-        show_time("[++++Info] {name} has joined".format(name=t.name))
+        show_time("[Info] {name} finishes quitting".format(name=t.name))
+
     show_time("[Info] Closed multithreading")
 
-    # last to close roomchat_sock because server_thread requires roomchat_sock
+    # Step 3. last to close roomchat_sock because server_thread requires roomchat_sock
     roomchat_sock.close()
     print("[Info] Closed socket")
 
+    # Step 4. exit the Python system
     sys.exit(0)
+
+
+def do_Debug():
+    f_link_name = str(forwardlink).split('laddr=')[-1] if forwardlink else forwardlink
+    print('[Debug] {} forward_link: {}'.format(show_time(printout=False), f_link_name))
+
+    MsgWin.insert(1.0, '\n[Debug] {} forward_link: {}'.format(show_time(printout=False), f_link_name))
+
+    b_link_names = [str(backwardlink[bw].getpeername()[-1]) for bw in backwardlink]
+    b_link_names = ', '.join(b_link_names)
+    print('[Debug] {} backward_links: {}'.format(show_time(printout=False), b_link_names))
+
+    MsgWin.insert(1.0, '\n[Debug] {} backward_links: {}'.format(show_time(printout=False), b_link_names))
 
 
 def build_tcp_server(msg_check_mem):
@@ -712,10 +718,6 @@ def build_tcp_server(msg_check_mem):
                     #     print("unknown socket!")
 
 
-# TODO: is this the right termination?
-# sockfd.close()
-# conn.close()
-
 def retain_forward_link(msg_check_mem, myHashID, msgID):
     global my_tcp_conns, roomname, username, myip, myport, MsgWin, roomchat_sock, sock_peers, \
         forwardlink, backwardlink, HID_msgID_dict
@@ -837,21 +839,6 @@ def forward_link(gList, myHashID, sock_peers_TODO,
                 start = (start + 1) % len(gList)
     return sock_peers, msgID, my_tcp_conns, forwardlink
 
-
-def do_Debug():
-    f_link_name = str(forwardlink).split('laddr=')[-1] if forwardlink else forwardlink
-    print('[Debug] {} forward_link: {}'.format(show_time(printout=False), f_link_name))
-
-    MsgWin.insert(1.0, '\n[Debug] {} forward_link: {}'.format(show_time(printout=False), f_link_name))
-
-    b_link_names = [str(backwardlink[bw].getpeername()[-1]) for bw in backwardlink]
-    b_link_names = ', '.join(b_link_names)
-    print('[Debug] {} backward_links: {}'.format(show_time(printout=False), b_link_names))
-
-    MsgWin.insert(1.0, '\n[Debug] {} backward_links: {}'.format(show_time(printout=False), b_link_names))
-
-
-# manager = mul\tiprocessing.Manager()
 #
 # Set up of Basic UI
 #
